@@ -1,0 +1,211 @@
+services:
+
+  # ==========================================================
+  # SQL SERVER
+  # ==========================================================
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: anime_sqlserver
+    restart: unless-stopped
+
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      MSSQL_PID: "Developer"
+
+    ports:
+      - "1433:1433"
+
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+    networks:
+      - anime_network
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD}' -C -Q 'SELECT 1' || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+
+  # ==========================================================
+  # MONGODB
+  # ==========================================================
+
+  mongodb:
+    image: mongo:8.0
+    container_name: anime_mongodb
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_USER}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_PASSWORD}"
+      MONGO_INITDB_DATABASE: anime_media
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - mongodb_data:/data/db
+
+    networks:
+      - anime_network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--username",
+          "${MONGO_USER}",
+          "--password",
+          "${MONGO_PASSWORD}",
+          "--authenticationDatabase",
+          "admin",
+          "--eval",
+          "db.adminCommand('ping')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+
+  # ==========================================================
+  # BACKEND
+  # Flask + PySpark + ALS
+  # ==========================================================
+
+  backend:
+    build:
+      context: ./BackEnd
+      dockerfile: Dockerfile
+
+    container_name: anime_backend
+    restart: unless-stopped
+
+    environment:
+      SQL_SERVER: sqlserver
+      SQL_PORT: 1433
+      SQL_DATABASE: AnimeDB
+      SQL_USER: sa
+      SQL_PASSWORD: "${MSSQL_SA_PASSWORD}"
+
+      MONGO_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/anime_media?authSource=admin"
+
+      JWT_SECRET: "${JWT_SECRET}"
+
+      MAX_RATINGS: 1000000
+      SPARK_DRIVER_MEMORY: 2g
+
+    ports:
+      - "5000:5000"
+
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+      mongodb:
+        condition: service_healthy
+
+    networks:
+      - anime_network
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:5000/api/health || exit 1"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+
+  # ==========================================================
+  # FRONTEND
+  # ==========================================================
+
+  frontend:
+    build:
+      context: ./FrontEnd
+      dockerfile: Dockerfile
+
+    container_name: anime_frontend
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - anime_network
+
+
+  # ==========================================================
+  # APACHE HOP
+  # ==========================================================
+
+  apache-hop:
+    build:
+      context: ./ApacheHop
+      dockerfile: Dockerfile
+
+    container_name: anime_hop
+
+    profiles:
+      - etl
+
+    environment:
+      SQL_SERVER: sqlserver
+      SQL_PORT: 1433
+      SQL_DATABASE: AnimeDB
+      SQL_USER: sa
+      SQL_PASSWORD: "${MSSQL_SA_PASSWORD}"
+
+    volumes:
+      - ./ApacheHop/data:/project/data
+      - ./ApacheHop/pipelines:/project/pipelines
+      - ./ApacheHop/workflows:/project/workflows
+
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+    networks:
+      - anime_network
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+
+volumes:
+
+  sqlserver_data:
+    name: anime_sqlserver_data
+
+  mongodb_data:
+    name: anime_mongodb_data
+
+
+# ============================================================
+# NETWORK
+# ============================================================
+
+networks:
+
+  anime_network:
+    name: anime_network
+    driver: bridge

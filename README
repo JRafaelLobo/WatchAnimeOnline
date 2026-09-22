@@ -1,0 +1,264 @@
+# Sistema Recomendador de Anime
+
+## Proyecto Integrador
+
+Aplicación web para la visualización y recomendación personalizada de anime.
+
+El proyecto implementa una arquitectura basada en APIs y contenedores Docker. Incluye autenticación de usuarios, consulta de información de anime, almacenamiento de contenido multimedia y un sistema recomendador basado en Apache Spark utilizando el algoritmo ALS.
+
+## Descripción
+
+El objetivo del proyecto es desarrollar un sitio web en el cual los usuarios puedan registrarse, iniciar sesión, consultar información relacionada con anime y recibir recomendaciones personalizadas.
+
+Tecnologías principales:
+- Frontend: interfaz web utilizada por los usuarios.
+- Flask: API REST principal del sistema.
+- Apache Spark / PySpark: procesamiento de datos y sistema recomendador.
+- ALS: algoritmo utilizado para generar recomendaciones.
+- Microsoft SQL Server: almacenamiento de información estructurada y dataset.
+- Apache Hop: proceso ETL encargado de migrar el dataset hacia SQL Server.
+- MongoDB / GridFS: almacenamiento de imágenes y documentos asociados a los anime.
+- Jikan API: fuente externa para consultar información pública relacionada con anime.
+- Docker / Docker Compose: contenerización y comunicación entre servicios.
+
+## Arquitectura del Sistema
+
+                         USUARIO
+                            |
+                            v
+                    +---------------+
+                    |   FrontEnd    |
+                    |    :3000      |
+                    +-------+-------+
+                            |
+                         REST API
+                            |
+                            v
+                    +---------------+
+                    |   Flask API   |
+                    |    :5000      |
+                    +---+-------+---+
+                        |       |
+              +---------+       +---------+
+              |                           |
+              v                           v
+       +--------------+            +--------------+
+       | SQL Server   |            |   MongoDB    |
+       |    :1433     |            |    :27017    |
+       +------+-------+            |    GridFS    |
+              ^                    +--------------+
+              |
+          Apache Hop
+              ^
+              |
+          Dataset
+
+Flask API también se comunica con Jikan API para obtener información complementaria de anime y con PySpark/ALS para generar recomendaciones.
+
+## Estructura del Proyecto
+
+Tarea8/
+|-- docker-compose.yml
+|-- .env
+|-- .gitignore
+|-- README.txt
+|-- ApacheHop/
+|   |-- Dockerfile
+|   |-- data/
+|   |-- pipelines/
+|   `-- workflows/
+|-- BackEnd/
+|   |-- Dockerfile
+|   |-- requirements.txt
+|   |-- app.py
+|   |-- config/
+|   |-- routes/
+|   `-- services/
+|-- BaseDeDatos/
+|   |-- 01-database.sql
+|   `-- 02-users.sql
+`-- FrontEnd/
+    |-- Dockerfile
+    |-- package.json
+    |-- src/
+    `-- public/
+
+## Backend
+
+El Backend está desarrollado con Flask y funciona como punto central de comunicación. Se divide en config, routes y services.
+
+Endpoints principales:
+
+Sistema:
+GET /api/health
+
+Autenticación:
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me
+
+Anime:
+GET /api/anime/search?q=naruto
+GET /api/anime/<id>
+GET /api/anime/top
+GET /api/anime/genres
+GET /api/anime/season/now
+
+Recomendador:
+GET  /api/recommendations/status
+POST /api/recommendations/train
+GET  /api/recommendations/me
+GET  /api/recommendations/<user_id>
+
+Multimedia:
+POST   /api/media/<anime_id>
+GET    /api/media/<anime_id>
+GET    /api/media/file/<file_id>
+DELETE /api/media/file/<file_id>
+
+## Autenticación
+
+El sistema permite registro e inicio de sesión. Las contraseñas se almacenan mediante hash y el acceso a rutas protegidas utiliza tokens JWT.
+
+Las peticiones protegidas deben enviar:
+Authorization: Bearer TOKEN
+
+## Microsoft SQL Server
+
+SQL Server funciona como base de datos relacional principal. La base utilizada por el proyecto es AnimeDB y almacena información estructurada como usuarios y ratings.
+
+La estructura de ratings conserva:
+- userId
+- movieId
+- rating
+- timestamp
+
+## Apache Hop
+
+Apache Hop se utiliza para ejecutar el proceso ETL requerido en el proyecto. El dataset debe migrarse hacia Microsoft SQL Server mediante los pipelines correspondientes.
+
+Flujo:
+Dataset -> Apache Hop -> SQL Server -> PySpark ALS -> API -> Frontend
+
+Los recursos se organizan en:
+ApacheHop/data/
+ApacheHop/pipelines/
+ApacheHop/workflows/
+
+## Sistema Recomendador
+
+El sistema recomendador utiliza Apache Spark, PySpark y ALS (Alternating Least Squares).
+
+PySpark obtiene los ratings almacenados en SQL Server. ALS utiliza las interacciones entre usuarios e ítems para construir un modelo y producir recomendaciones personalizadas.
+
+Flujo:
+SQL Server -> ratings -> PySpark -> ALS -> modelo -> recomendaciones -> Flask API -> Frontend
+
+## API Externa de Anime
+
+El Backend dispone de una integración con Jikan para obtener información complementaria sobre anime, como títulos, sinopsis, géneros, episodios, puntuaciones y otros metadatos.
+
+El Frontend no consulta directamente la API externa. La comunicación se centraliza mediante Flask:
+Frontend -> Flask API -> Jikan API
+
+La API externa complementa el proyecto y no sustituye la migración del dataset realizada mediante Apache Hop.
+
+## MongoDB y GridFS
+
+MongoDB se utiliza para almacenar contenido multimedia asociado a anime, particularmente imágenes y archivos PDF. GridFS permite almacenar y recuperar los archivos desde el Backend.
+
+Flujo:
+Frontend -> Flask API -> MongoDB / GridFS
+
+## Docker
+
+Los componentes principales se ejecutan utilizando contenedores Docker.
+
+Servicios:
+- sqlserver
+- mongodb
+- backend
+- frontend
+- apache-hop
+
+Los servicios se comunican mediante la red anime_network.
+
+Puertos:
+- Frontend: 3000
+- Backend: 5000
+- SQL Server: 1433
+- MongoDB: 27017
+
+## Variables de Entorno
+
+El proyecto utiliza un archivo .env en la raíz.
+
+Ejemplo:
+MSSQL_SA_PASSWORD=CAMBIAR_PASSWORD_SQL
+MONGO_USER=animeadmin
+MONGO_PASSWORD=CAMBIAR_PASSWORD_MONGO
+JWT_SECRET=CAMBIAR_CLAVE_JWT
+
+No deben publicarse credenciales reales en repositorios.
+
+## Ejecución
+
+Validar Docker Compose:
+docker compose config
+
+Construir imágenes:
+docker compose build
+
+Levantar servicios:
+docker compose up -d
+
+Consultar estado:
+docker compose ps
+
+Consultar logs:
+docker compose logs -f
+
+Backend:
+docker compose logs -f backend
+
+Ejecutar Apache Hop con el perfil ETL:
+docker compose --profile etl run --rm apache-hop
+
+Detener proyecto:
+docker compose down
+
+Para eliminar también los volúmenes:
+docker compose down -v
+
+ADVERTENCIA: docker compose down -v elimina los volúmenes y puede borrar los datos almacenados localmente.
+
+## Flujo General
+
+1. Apache Hop migra el dataset hacia SQL Server.
+2. SQL Server almacena los datos estructurados.
+3. El usuario accede al Frontend.
+4. El usuario se registra o inicia sesión.
+5. Flask administra autenticación y JWT.
+6. El usuario consulta información de anime mediante las APIs.
+7. Flask consulta información externa cuando corresponde.
+8. Imágenes y PDF pueden almacenarse en MongoDB/GridFS.
+9. PySpark obtiene ratings desde SQL Server.
+10. ALS entrena el modelo recomendador.
+11. El usuario solicita recomendaciones.
+12. Flask devuelve los resultados al Frontend.
+
+## Seguridad
+
+El proyecto contempla:
+- Contraseñas mediante hash.
+- Autenticación JWT.
+- Variables de entorno para credenciales.
+- Consultas SQL parametrizadas.
+- Restricción de tipos y tamaño de archivos.
+- Red interna de Docker para comunicación entre servicios.
+
+## Autores
+
+- José Lobo
+- Luis Carlo
+- Felix Dominguez
