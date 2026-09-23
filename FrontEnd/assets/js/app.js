@@ -138,7 +138,7 @@ $('#recommendForm').addEventListener('click', async () => {
     const result = await request(`/recommendations?limit=${limit}`);
     const recommendations = result.recommendations || [];
     resultList.innerHTML = recommendations.length
-      ? `<div class="recommendation-summary">${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles</div>${recommendations.map((item) => `<div class="result-item"><strong>Anime #${item.movieId}</strong><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')}`
+      ? `<div class="recommendation-summary">${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles</div>${recommendations.map((item) => `<div class="result-item"><strong>${item.title || `Anime #${item.movieId}`}</strong><small>#${item.movieId}</small><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')}`
       : `<span>${result.message || 'No hay recomendaciones para este usuario.'}</span>`;
     resultList.querySelectorAll('[data-anime-id]').forEach((link) => link.addEventListener('click', (clickEvent) => {
       clickEvent.preventDefault();

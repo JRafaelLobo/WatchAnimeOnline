@@ -191,6 +191,7 @@ def _complete_openapi_spec():
             "type": "object",
             "properties": {
                 "movieId": {"type": "integer", "description": "anime_id de Reviews"},
+                "title": {"type": "string"},
                 "predictedRating": {"type": "number", "format": "float"}
             }
         },

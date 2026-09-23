@@ -72,3 +72,29 @@ def anime_detail(anime_id):
         anime_id
     )
     return {"data": items[0]} if items else None
+
+
+def anime_titles(anime_ids):
+    if not anime_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in anime_ids)
+    connection = get_connection()
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""
+            SELECT anime_id, title, title_english
+            FROM Animes
+            WHERE anime_id IN ({placeholders})
+            """,
+            *anime_ids
+        )
+        titles = {
+            int(row.anime_id): row.title_english or row.title
+            for row in cursor.fetchall()
+        }
+        cursor.close()
+        return titles
+    finally:
+        connection.close()

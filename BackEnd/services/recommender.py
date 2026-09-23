@@ -203,9 +203,14 @@ def generate_global_recommendations(limit=10):
 		.limit(limit)
 		.collect()
 	)
+	from services.catalog import anime_titles
+
+	ids = [int(row.movieId) for row in rows]
+	titles = anime_titles(ids)
 	return [
 		{
 			"movieId": int(row.movieId),
+			"title": titles.get(int(row.movieId), f"Anime #{int(row.movieId)}"),
 			"predictedRating": float(row.predictedRating),
 			"userSupport": int(row.userSupport)
 		}
