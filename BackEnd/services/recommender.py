@@ -42,46 +42,17 @@ def _get_spark():
 
 def load_ratings():
 	spark = _get_spark()
-	if _sql_table_exists("ratings"):
-		query = (
-			f"(SELECT TOP {MAX_ROWS} userId, movieId, rating "
-			"FROM ratings WHERE userId IS NOT NULL "
-			"AND movieId IS NOT NULL AND rating IS NOT NULL AND rating > 0) AS source_ratings"
-		)
-	else:
-		query = (
-			f"(SELECT TOP {MAX_ROWS} user_id AS userId, anime_id AS movieId, my_score AS rating "
-			"FROM Reviews WHERE user_id IS NOT NULL AND anime_id IS NOT NULL "
-			"AND my_score IS NOT NULL AND my_score > 0) AS source_reviews"
-		)
+	query = (
+		f"(SELECT TOP {MAX_ROWS} user_id AS userId, anime_id AS movieId, my_score AS rating "
+		"FROM Reviews WHERE user_id IS NOT NULL AND anime_id IS NOT NULL "
+		"AND my_score IS NOT NULL AND my_score > 0) AS source_reviews"
+	)
 	ratings = spark.read.jdbc(url=JDBC_URL, table=query, properties=JDBC_PROPERTIES)
 	return ratings.selectExpr(
 		"CAST(userId AS INT) AS userId",
 		"CAST(movieId AS INT) AS movieId",
 		"CAST(rating AS FLOAT) AS rating"
 	).repartition(8, "userId")
-
-
-def _sql_table_exists(table_name):
-	import pyodbc
-
-	connection = pyodbc.connect(
-		"DRIVER={ODBC Driver 18 for SQL Server};"
-		f"SERVER={SQL_SERVER},{SQL_PORT};"
-		f"DATABASE={SQL_DATABASE};"
-		f"UID={SQL_USER};"
-		f"PWD={SQL_PASSWORD};"
-		"TrustServerCertificate=yes;"
-	)
-	try:
-		cursor = connection.cursor()
-		cursor.execute(
-			"SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?",
-			table_name
-		)
-		return cursor.fetchone() is not None
-	finally:
-		connection.close()
 
 
 def train_model():
@@ -151,12 +122,19 @@ def _load_seen_items():
 	}
 
 
+def has_trained_user(user_id):
+	"""Return model membership, or None when no model can be prepared."""
+	if not _ensure_model():
+		return None
+	return _model.userFactors.filter(f"id = {int(user_id)}").limit(1).count() > 0
+
+
 def generate_recommendations(user_id, limit=10):
 	if not _ensure_model():
 		return None
 	seen_items = _seen_items.get(int(user_id), set())
 	users = _get_spark().createDataFrame([(int(user_id),)], ["userId"])
-	candidate_limit = min(limit + len(seen_items), 100)
+	candidate_limit = limit + len(seen_items)
 	rows = _model.recommendForUserSubset(users, candidate_limit).collect()
 	if not rows:
 		return []
@@ -165,7 +143,13 @@ def generate_recommendations(user_id, limit=10):
 		for item in rows[0].recommendations
 		if int(item.movieId) not in seen_items
 	]
-	return recommendations[:limit]
+	from services.catalog import anime_titles
+
+	recommendations = recommendations[:limit]
+	titles = anime_titles([item["movieId"] for item in recommendations])
+	for item in recommendations:
+		item["title"] = titles.get(item["movieId"], f"Anime #{item['movieId']}")
+	return recommendations
 
 
 def _ensure_model():

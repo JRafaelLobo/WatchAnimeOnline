@@ -8,7 +8,7 @@ El proyecto implementa una arquitectura basada en APIs y contenedores Docker. In
 
 ## Descripción
 
-El objetivo del proyecto es desarrollar un sitio web en el cual los usuarios puedan registrarse, iniciar sesión, consultar información relacionada con anime y recibir recomendaciones personalizadas.
+El objetivo del proyecto es desarrollar un sitio web en el cual los usuarios existentes puedan iniciar sesión, consultar información relacionada con anime y recibir recomendaciones personalizadas.
 
 Tecnologías principales:
 - Frontend: interfaz web utilizada por los usuarios.
@@ -93,7 +93,6 @@ Sistema:
 GET /api/health
 
 Autenticación:
-POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
 
@@ -118,7 +117,39 @@ DELETE /api/media/file/<file_id>
 
 ## Autenticación
 
-El sistema permite registro e inicio de sesión. Las contraseñas se almacenan mediante hash y el acceso a rutas protegidas utiliza tokens JWT.
+El sistema permite iniciar sesión con cuentas existentes en `auth_users` usando
+correo y contraseña. No hay registro público ni se crean usuarios, contraseñas
+o datos de prueba. Las contraseñas existentes se verifican con Werkzeug y las
+rutas protegidas utilizan tokens JWT.
+
+La pantalla de acceso mantiene el estilo del catálogo. Permite explorar como
+invitado, mostrar u ocultar la contraseña y cerrar sesión. El navegador guarda
+solo el token en `sessionStorage`, verifica la sesión con `GET /api/auth/me`
+al recargar y vuelve al acceso cuando vence. Nunca guarda contraseñas.
+
+El ID del token siempre identifica `auth_users.id`. Para las recomendaciones,
+el backend busca una coincidencia única entre `auth_users.nombre` y
+`Usuarios.username`, según la comparación de SQL Server. Si varias cuentas
+comparten ese nombre, o el nombre corresponde a varios `Usuarios.user_id`,
+no vincula el perfil. No asume que los IDs de ambas tablas sean iguales.
+No modifica nombres, tablas, credenciales ni datos para crear esta relación.
+
+`GET /api/auth/me` devuelve la cuenta y `profile` con `userId`, `username`,
+`meanScore` y `reviewCount` (animes con valoración positiva), o `null` si no
+hay una coincidencia única. El frontend muestra estos datos en el perfil.
+`GET /api/recommendations/me` usa ese `userId` y su historial en `Reviews`.
+Si falta un perfil único o el modelo no conoce al usuario, devuelve
+recomendaciones generales con un mensaje explícito. Si ya no quedan animes
+nuevos para un usuario conocido, devuelve una lista personalizada vacía.
+Los invitados siguen usando `GET /api/recommendations`.
+
+`GET /api/recommendations/<user_id>` requiere sesión y solo permite consultar
+el perfil vinculado a esa cuenta. Las cargas multimedia conservan el ID de
+la cuenta en `uploadedBy`; solo esa cuenta puede eliminar sus archivos.
+
+La base debe contener cuentas válidas previamente provisionadas para iniciar
+sesión. Los perfiles importados en `Usuarios` no tienen contraseña y por sí
+solos no permiten autenticarse.
 
 Las peticiones protegidas deben enviar:
 Authorization: Bearer TOKEN
@@ -258,7 +289,7 @@ ADVERTENCIA: docker compose down -v elimina los volúmenes y puede borrar los da
 1. Apache Hop migra el dataset hacia SQL Server.
 2. SQL Server almacena los datos estructurados.
 3. El usuario accede al Frontend.
-4. El usuario se registra o inicia sesión.
+4. El usuario inicia sesión con una cuenta existente o explora como invitado.
 5. Flask administra autenticación y JWT.
 6. El usuario consulta información de anime mediante las APIs.
 7. Flask consulta información externa cuando corresponde.
@@ -283,3 +314,15 @@ El proyecto contempla:
 - José Lobo
 - Luis Carlo
 - Felix Dominguez
+
+## Verificación de autenticación
+
+Las pruebas aisladas usan clientes de prueba de Flask y dobles de SQL,
+MongoDB y Spark, sin iniciar contenedores ni acceder a bases reales:
+
+    cd BackEnd
+    python -m unittest discover -s tests -v
+
+Requieren las dependencias Python del backend. Cubren acceso con cuentas
+existentes, validación de sesión, vínculos ambiguos, identidad de las
+recomendaciones y permisos sobre archivos.

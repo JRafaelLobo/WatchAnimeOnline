@@ -3,6 +3,7 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from werkzeug.exceptions import HTTPException
 
 from config.sqlserver import initialize_database
 from routes.anime import anime_bp
@@ -40,7 +41,26 @@ def create_app():
     # EXTENSIONS
     # ========================================================
 
-    JWTManager(app)
+    jwt = JWTManager(app)
+
+    @jwt.unauthorized_loader
+    def missing_token(reason):
+        return jsonify({"error": "Iniciá sesión para continuar."}), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token(reason):
+        return jsonify({"error": "La sesión no es válida. Iniciá sesión nuevamente."}), 401
+
+    @jwt.expired_token_loader
+    def expired_token(header, payload):
+        return jsonify({"error": "Tu sesión venció. Iniciá sesión nuevamente."}), 401
+
+    @app.errorhandler(HTTPException)
+    def http_error(error):
+        response = error.get_response()
+        response.data = app.json.dumps({"error": error.description})
+        response.content_type = "application/json"
+        return response
 
     CORS(
         app,
@@ -126,7 +146,6 @@ OPENAPI_SPEC = {
     },
     "paths": {
         "/api/health": {"get": {"summary": "Healthcheck", "responses": {"200": {"description": "OK"}}}},
-        "/api/auth/register": {"post": {"summary": "Register", "requestBody": {"required": True, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Credentials"}}}}, "responses": {"201": {"description": "Created"}, "400": {"description": "Invalid input"}, "409": {"description": "Duplicate email"}}}},
         "/api/auth/login": {"post": {"summary": "Login", "requestBody": {"required": True, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Credentials"}}}}, "responses": {"200": {"description": "JWT issued"}, "401": {"description": "Invalid credentials"}}}},
         "/api/auth/me": {"get": {"security": [{"bearerAuth": []}], "responses": {"200": {"description": "Current user"}, "401": {"description": "Unauthorized"}}}},
         "/api/anime/search": {"get": {"parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}, {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 25}}], "responses": {"200": {"description": "Jikan results"}, "400": {"description": "Missing query"}, "502": {"description": "External API error"}}}},
@@ -157,21 +176,13 @@ def _complete_openapi_spec():
     })
     OPENAPI_SPEC["tags"] = [
         {"name": "System", "description": "Estado del servicio"},
-        {"name": "Auth", "description": "Registro y autenticación JWT"},
+        {"name": "Auth", "description": "Inicio de sesión de cuentas existentes"},
         {"name": "Anime", "description": "Catálogo consultado mediante Jikan"},
         {"name": "Recommendations", "description": "Modelo ALS sobre Reviews de SQL Server"},
         {"name": "Media", "description": "Archivos almacenados en MongoDB/GridFS"}
     ]
     schemas = OPENAPI_SPEC["components"]["schemas"]
     schemas.update({
-        "RegisterRequest": {
-            "type": "object", "required": ["nombre", "email", "password"],
-            "properties": {
-                "nombre": {"type": "string", "minLength": 1},
-                "email": {"type": "string", "format": "email"},
-                "password": {"type": "string", "format": "password", "minLength": 8}
-            }
-        },
         "LoginRequest": {
             "type": "object", "required": ["email", "password"],
             "properties": {
@@ -237,10 +248,61 @@ def _complete_openapi_spec():
         "operationId": "healthCheck",
         "responses": {"200": {"description": "Servicio disponible", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HealthResponse"}}}}}
     })
-    paths["/api/auth/register"]["post"]["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/RegisterRequest"}
     paths["/api/auth/login"]["post"]["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/LoginRequest"}
-    paths["/api/auth/register"]["post"]["responses"].update({"409": {"description": "Email ya registrado"}, "500": {"description": "No se pudo registrar"}})
-    paths["/api/auth/login"]["post"]["responses"].update({"500": {"description": "Error de base de datos"}})
+    paths["/api/auth/login"]["post"]["responses"].update({
+        "400": {"description": "Credenciales inválidas o incompletas"},
+        "503": {"description": "Base de datos no disponible"}
+    })
+    paths["/api/auth/me"]["get"]["responses"]["503"] = {"description": "Base de datos no disponible"}
+    schemas["UserProfile"] = {
+        "type": "object", "nullable": True,
+        "properties": {
+            "userId": {"type": "integer", "format": "int64"},
+            "username": {"type": "string"},
+            "meanScore": {"type": "number", "nullable": True},
+            "reviewCount": {"type": "integer"}
+        }
+    }
+    schemas["User"] = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer", "description": "ID de cuenta en auth_users"},
+            "nombre": {"type": "string"}, "email": {"type": "string"},
+            "fechaCreacion": {"type": "string", "nullable": True},
+            "profile": {"$ref": "#/components/schemas/UserProfile"}
+        }
+    }
+    paths["/api/auth/login"]["post"]["responses"]["200"] = {
+        "description": "Sesión iniciada con una cuenta existente",
+        "content": {"application/json": {"schema": {
+            "type": "object", "properties": {
+                "accessToken": {"type": "string"},
+                "user": {"$ref": "#/components/schemas/User"}
+            }
+        }}}
+    }
+    paths["/api/auth/me"]["get"]["responses"]["200"] = {
+        "description": "Cuenta actual y perfil único de Usuarios, si existe",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}
+    }
+    schemas["RecommendationsResponse"]["properties"].update({
+        "mode": {"type": "string", "enum": ["personalized", "global"]},
+        "accountId": {"type": "integer"},
+        "userId": {"type": "integer", "format": "int64", "nullable": True},
+        "profile": {"$ref": "#/components/schemas/UserProfile"}
+    })
+    paths["/api/recommendations/me"]["get"]["description"] = (
+        "Usa el perfil único cuyo username coincide con nombre de la cuenta. "
+        "Sin coincidencia única o sin historial en el modelo, devuelve recomendaciones generales."
+    )
+    paths["/api/recommendations/{user_id}"]["get"]["security"] = [{"bearerAuth": []}]
+    paths["/api/recommendations/{user_id}"]["get"]["responses"].update({
+        "401": {"description": "Sesión ausente o inválida"},
+        "403": {"description": "El perfil solicitado no pertenece a la cuenta"}
+    })
+    paths["/api/media/file/{file_id}"]["delete"]["responses"]["403"] = {
+        "description": "Solo se pueden eliminar archivos subidos por la cuenta actual"
+    }
     for path in ("/api/anime/top", "/api/anime/season/now"):
         paths[path]["get"]["parameters"] = [
             {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "default": 1}},

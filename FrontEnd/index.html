@@ -14,34 +14,83 @@
   <div class="page">
     <header class="topbar">
       <div class="brand">WatchAn<span>i</span>meOnline</div>
-      <form class="search" id="searchForm">
+      <form class="search" id="searchForm" hidden>
         <input id="searchInput" placeholder="Buscar anime..." aria-label="Buscar anime">
         <button type="submit" aria-label="Buscar">⌕</button>
       </form>
       <div class="api-status"><span class="status-dot" id="apiStatusDot"></span><span id="apiStatus">Conectando API...</span></div>
+      <div class="session-controls" id="sessionControls" hidden>
+        <span class="session-name" id="sessionName" hidden></span>
+        <button class="login" id="openLogin" type="button">Iniciar sesión</button>
+        <button class="logout" id="logoutButton" type="button" hidden>Cerrar sesión</button>
+      </div>
     </header>
 
-    <section class="hero">
-      <div class="hero-image" id="heroImage"></div>
-      <div class="hero-content">
-        <div class="hero-kicker">Presentación destacada</div>
-        <h1 id="heroTitle">Cargando tu próxima historia</h1>
-        <div class="hero-meta"><span id="heroYear">Anime Atlas</span><i></i><span id="heroType">Explorá sin registro</span><i></i><b id="heroScore">★ 8.8</b></div>
-        <p class="hero-copy" id="heroCopy">Descubrí títulos populares, novedades y recomendaciones conectadas con tu backend.</p>
-        <div class="actions"><button class="watch" id="watchButton">▶ Ver ahora</button><button class="detail" id="heroDetail">Detalle ›</button></div>
-      </div>
-      <div class="slide-controls"><button id="previousSlide" aria-label="Anterior">‹</button><button id="nextSlide" aria-label="Siguiente">›</button></div>
-    </section>
-    <main class="content">
-      <div class="section-heading"><h2>Trending</h2><span id="catalogStatus">Actualizado desde tu API</span></div>
-      <div class="tabs"><button class="tab active" data-catalog="top">Tendencias</button><button class="tab" data-catalog="season">Temporada actual</button><button class="tab" data-catalog="search">Resultados</button></div>
-      <div class="rail" id="animeRail"><div class="state">Cargando títulos...</div></div>
-      <div class="lower-grid">
-        <section class="info-panel"><h3>Recomendado por la comunidad</h3><p>El motor ALS aprende de los gustos de todos los usuarios y genera recomendaciones generales. No necesitás indicar un usuario.</p><div class="recommend-controls"><label for="recommendLimit">Cantidad</label><select id="recommendLimit"><option value="5">5</option><option value="10" selected>10</option><option value="20">20</option><option value="30">30</option></select><button class="recommend-action" id="recommendForm" type="button">Generar recomendaciones</button></div><div class="result-list" id="recommendationResults"><span>Generá una lista basada en los gustos aprendidos.</span></div></section>
+    <main class="login-view" id="loginView">
+      <section class="login-intro" aria-labelledby="loginIntroTitle">
+        <div class="hero-kicker">Una historia para cada gusto</div>
+        <h1 id="loginIntroTitle">Tu anime,<br>a tu <span>manera.</span></h1>
+        <p>Volvé a descubrir el catálogo con recomendaciones que toman en cuenta tus reseñas y tu perfil.</p>
+        <div class="login-tags" aria-label="Explorá el catálogo"><span>Tendencias</span><span>Temporada actual</span><span>Para vos</span></div>
+      </section>
+      <section class="login-panel" aria-labelledby="loginTitle">
+        <div class="login-mark" aria-hidden="true">✦</div>
+        <h2 id="loginTitle">Iniciar sesión</h2>
+        <p class="login-description">Usá el correo y la contraseña de tu cuenta existente.</p>
+        <p class="form-feedback" id="loginFeedback" role="status" aria-live="polite" hidden></p>
+        <button class="retry-session" id="retrySession" type="button" hidden>Reintentar conexión</button>
+        <form id="loginForm">
+          <fieldset id="loginFields">
+            <label for="loginEmail">Correo electrónico</label>
+            <input id="loginEmail" name="email" type="email" autocomplete="username" placeholder="tu@correo.com" aria-describedby="loginFeedback" maxlength="255" required>
+            <label for="loginPassword">Contraseña</label>
+            <div class="password-field">
+              <input id="loginPassword" name="password" type="password" autocomplete="current-password" aria-describedby="loginFeedback" required>
+              <button id="togglePassword" type="button" aria-label="Mostrar contraseña" aria-controls="loginPassword" aria-pressed="false">Mostrar</button>
+            </div>
+            <button class="login-submit" id="loginSubmit" type="submit">Entrar a mi cuenta <span aria-hidden="true">→</span></button>
+          </fieldset>
+        </form>
+        <p class="account-note">El acceso está disponible para cuentas existentes.</p>
+        <button class="guest-access" id="continueGuest" type="button">Explorar como invitado <span aria-hidden="true">↗</span></button>
+      </section>
+    </main>
+
+    <main id="catalogView" hidden>
+      <section class="hero">
+        <div class="hero-image" id="heroImage"></div>
+        <div class="hero-content">
+          <div class="hero-kicker">Presentación destacada</div>
+          <h1 id="heroTitle">Cargando tu próxima historia</h1>
+          <div class="hero-meta"><span id="heroYear">Anime Atlas</span><i></i><span id="heroType">Explorá el catálogo</span><i></i><b id="heroScore">★ N/D</b></div>
+          <p class="hero-copy" id="heroCopy">Descubrí títulos populares, novedades y recomendaciones para tu próxima historia.</p>
+          <div class="actions"><button class="watch" id="watchButton" type="button" disabled>▶ Ver ahora</button><button class="detail" id="heroDetail" type="button" disabled>Detalle ›</button></div>
+        </div>
+        <div class="slide-controls"><button id="previousSlide" type="button" aria-label="Anterior" disabled>‹</button><button id="nextSlide" type="button" aria-label="Siguiente" disabled>›</button></div>
+      </section>
+      <div class="content">
+        <div class="section-heading"><h2>Trending</h2><span id="catalogStatus" role="status">Actualizado desde tu API</span></div>
+        <div class="tabs" aria-label="Catálogo"><button class="tab active" data-catalog="top" type="button" aria-pressed="true">Tendencias</button><button class="tab" data-catalog="season" type="button" aria-pressed="false">Temporada actual</button><button class="tab" data-catalog="search" type="button" aria-pressed="false">Resultados</button></div>
+        <div class="rail" id="animeRail"><div class="state">Cargando títulos...</div></div>
+        <div class="lower-grid">
+          <section class="info-panel" aria-labelledby="recommendationHeading">
+            <h3 id="recommendationHeading">Recomendado por la comunidad</h3>
+            <p id="recommendationDescription">Explorá recomendaciones generales o iniciá sesión para descubrir títulos según tu perfil.</p>
+            <div class="recommend-controls"><label for="recommendLimit">Cantidad</label><select id="recommendLimit"><option value="5">5</option><option value="10" selected>10</option><option value="20">20</option><option value="30">30</option></select><button class="recommend-action" id="recommendForm" type="button" disabled>Generar recomendaciones</button></div>
+            <div class="result-list" id="recommendationResults" role="status" aria-live="polite"><span>Generá una lista basada en los gustos de la comunidad.</span></div>
+          </section>
+          <section class="info-panel profile-panel" aria-labelledby="profileHeading">
+            <div class="profile-kicker">Tu espacio</div>
+            <h3 id="profileHeading">Descubrí algo para vos</h3>
+            <p id="profileDescription">Ingresá con tu cuenta para usar tu perfil en las recomendaciones.</p>
+            <dl class="profile-details" id="profileDetails" hidden></dl>
+            <button class="profile-login" id="profileLogin" type="button">Iniciar sesión <span aria-hidden="true">→</span></button>
+          </section>
+        </div>
       </div>
     </main>
     <footer class="footer">Anime Atlas · Flask API · Jikan · SQL Server · Spark ALS</footer>
   </div>
-  <div class="toast" id="toast" role="status"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

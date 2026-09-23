@@ -9,10 +9,7 @@ from flask import (
     stream_with_context
 )
 
-from flask_jwt_extended import (
-    get_jwt_identity,
-    jwt_required
-)
+from flask_jwt_extended import jwt_required
 
 from gridfs.errors import NoFile
 
@@ -22,6 +19,7 @@ from config.mongodb import (
 )
 from config.sqlserver import get_connection
 from services.jikan import get_anime
+from services.users import get_current_user
 
 
 media_bp = Blueprint(
@@ -140,6 +138,7 @@ ALLOWED_CONTENT_TYPES = {
 )
 @jwt_required()
 def upload_media(anime_id):
+    user_id = get_current_user()["id"]
     if "file" not in request.files:
         return jsonify({
             "error": "Debe enviar un archivo en el campo file"
@@ -158,10 +157,6 @@ def upload_media(anime_id):
                 "Solo se permiten JPG, PNG, WEBP y PDF"
             )
         }), 400
-
-    user_id = int(
-        get_jwt_identity()
-    )
 
     try:
         file_id = fs.put(
@@ -277,6 +272,7 @@ def download_media(file_id):
 )
 @jwt_required()
 def delete_media(file_id):
+    user_id = get_current_user()["id"]
     try:
         object_id = ObjectId(file_id)
 
@@ -291,6 +287,12 @@ def delete_media(file_id):
         }), 404
 
     try:
+        media = db.anime_media.find_one({"fileId": object_id})
+        if not media or media.get("uploadedBy") != user_id:
+            return jsonify({
+                "error": "Solo puedes eliminar los archivos que has subido"
+            }), 403
+
         fs.delete(object_id)
 
         db.anime_media.delete_many({
