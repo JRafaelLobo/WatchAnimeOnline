@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimeStream - Tu Recomendador de Anime</title>
+  <style>
+    :root {
+      --bg-color: #0b0c10;
+      --card-bg: #1f2833;
+      --accent: #ff640a; /* Naranja Crunchyroll */
+      --text-main: #ffffff;
+      --text-muted: #c5c6c7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-bottom: 50px;
+    }
+
+    /* Navbar estilo Streaming */
+    header {
+      background-color: rgba(11, 12, 16, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 3rem;
+      border-bottom: 1px solid #1f2833;
+    }
+
+    .logo {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .btn-login {
+      background-color: transparent;
+      color: var(--text-main);
+      border: 1px solid var(--text-muted);
+    }
+
+    .btn-login:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-register {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-register:hover {
+      background-color: #e05500;
+    }
+
+    /* Contenido principal */
+    main {
+      padding: 2rem 3rem;
+    }
+
+    /* Hero Banner */
+    .hero {
+      background: linear-gradient(180deg, rgba(11,12,16,0.2) 0%, rgba(11,12,16,1) 100%), 
+                  url('https://images.alphacoders.com/605/605592.png') center/cover;
+      height: 300px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      max-width: 600px;
+    }
+
+    /* Secciones de Carruseles / Grillas */
+    .section-title {
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+
+    .anime-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+      margin-bottom: 3rem;
+    }
+
+    /* Tarjetas de Anime */
+    .anime-card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .anime-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .anime-card img {
+      width: 100%;
+      height: 260px;
+      object-fit: cover;
+    }
+
+    .anime-info {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .anime-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .anime-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .rating-badge {
+      background-color: rgba(255, 100, 10, 0.2);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    /* Spinner de Carga */
+    .loader {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">AnimeStream</div>
+    <div class="nav-user">
+      <button class="btn btn-login">Iniciar Sesión</button>
+      <button class="btn btn-register">Registrarse</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Descubre tu próximo Anime</h1>
+      <p>Sistema personalizado de recomendaciones impulsado por IA y Machine Learning.</p>
+    </div>
+
+    <!-- Sección de Recomendaciones Personalizadas (Tu API) -->
+    <h2 class="section-title">Recomendados para ti (Tu API ML)</h2>
+    <div class="anime-grid" id="recommendations-grid">
+      <div class="loader">Cargando recomendaciones personalizadas...</div>
+    </div>
+
+    <!-- Sección de Tendencias (Datos de Jikan / MyAnimeList) -->
+    <h2 class="section-title">Animes Más Populares (Jikan API)</h2>
+    <div class="anime-grid" id="popular-grid">
+      <div class="loader">Cargando catálogo...</div>
+    </div>
+  </main>
+
+  <script>
+    // 1. Cargar Animes Populares desde Jikan API (Prueba de Portadas)
+    async function fetchPopularAnime() {
+      const container = document.getElementById('popular-grid');
+      try {
+        const response = await fetch('https://api.jikan.moe/v4/top/anime?limit=12');
+        const result = await response.json();
+        
+        container.innerHTML = ''; // Limpiar loader
+
+        result.data.forEach(anime => {
+          const card = createAnimeCard({
+            title: anime.title,
+            image: anime.images.jpg.image_url,
+            score: anime.score || 'N/A',
+            episodes: anime.episodes ? `${anime.episodes} eps` : 'En emisión'
+          });
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error al consultar Jikan API:', error);
+        container.innerHTML = '<p>Error al cargar el catálogo popular.</p>';
+      }
+    }
+
+    // 2. Simulación de respuesta de TU Sistema Recomendador
+    // (En el futuro, esto hará fetch a tu API en Docker: http://localhost:5000/api/recommend/USER_ID)
+    async function fetchMyRecommendations() {
+      const container = document.getElementById('recommendations-grid');
+      
+      // Simulamos que la API nos devuelve una lista de IDs (ejemplo: 1, 20, 11061, 9253, 5114)
+      const mockRecommendedIds = [1, 20, 11061, 9253, 5114, 1535, 30276, 21];
+
+      try {
+        container.innerHTML = '';
+
+        // Obtenemos los detalles de la API de Jikan usando los IDs recomendados
+        for (const id of mockRecommendedIds.slice(0, 6)) {
+          const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
+          const result = await response.json();
+          const anime = result.data;
+
+          if (anime) {
+            const card = createAnimeCard({
+              title: anime.title,
+              image: anime.images.jpg.image_url,
+              score: anime.score || 'N/A',
+              episodes: anime.episodes ? `${anime.episodes} eps` : 'Serie'
+            });
+            container.appendChild(card);
+          }
+          // Pequeña pausa para no saturar el Rate Limit de la API pública de Jikan
+          await new Promise(r => setTimeout(r, 300));
+        }
+      } catch (error) {
+        console.error('Error al cargar recomendaciones:', error);
+        container.innerHTML = '<p>Error al conectar con el motor de recomendación.</p>';
+      }
+    }
+
+    // Helper para construir la tarjeta HTML
+    function createAnimeCard(data) {
+      const card = document.createElement('div');
+      card.className = 'anime-card';
+      card.innerHTML = `
+        <img src="${data.image}" alt="${data.title}" loading="lazy">
+        <div class="anime-info">
+          <div class="anime-title" title="${data.title}">${data.title}</div>
+          <div class="anime-meta">
+            <span>${data.episodes}</span>
+            <span class="rating-badge">★ ${data.score}</span>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+
+    // Inicializar llamadas al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchPopularAnime();
+      fetchMyRecommendations();
+    });
+  </script>
+</body>
+</html>
