@@ -130,16 +130,16 @@ document.querySelectorAll('[data-catalog]').forEach((button) => button.addEventL
 
 $('#nextSlide').onclick = () => { slide = (slide + 1) % catalog.length; setHero(catalog[slide]); };
 $('#previousSlide').onclick = () => { slide = (slide - 1 + catalog.length) % catalog.length; setHero(catalog[slide]); };
-$('#recommendForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
+$('#recommendForm').addEventListener('click', async () => {
   const resultList = $('#recommendationResults');
   resultList.innerHTML = '<span>Consultando el modelo...</span>';
   try {
-    const result = await request(`/recommendations/${$('#recommendUser').value}?limit=6`);
+    const limit = Number($('#recommendLimit').value);
+    const result = await request(`/recommendations?limit=${limit}`);
     const recommendations = result.recommendations || [];
     resultList.innerHTML = recommendations.length
-      ? recommendations.map((item) => `<div class="result-item"><strong>Anime #${item.movieId}</strong><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')
-      : '<span>No hay recomendaciones para este usuario.</span>';
+      ? `<div class="recommendation-summary">${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles</div>${recommendations.map((item) => `<div class="result-item"><strong>Anime #${item.movieId}</strong><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')}`
+      : `<span>${result.message || 'No hay recomendaciones para este usuario.'}</span>`;
     resultList.querySelectorAll('[data-anime-id]').forEach((link) => link.addEventListener('click', (clickEvent) => {
       clickEvent.preventDefault();
       showDetail(link.dataset.animeId);

@@ -131,6 +131,7 @@ services:
 
       MAX_RATINGS: 1000000
       SPARK_DRIVER_MEMORY: 2g
+      ALS_MODEL_PATH: /app/model/als_model
 
     ports:
       - "5000:5000"
@@ -147,6 +148,9 @@ services:
 
     networks:
       - anime_network
+
+    volumes:
+      - als_model_data:/app/model
 
     healthcheck:
       test:
@@ -231,6 +235,9 @@ volumes:
 
   mongodb_data:
     name: anime_mongodb_data
+
+  als_model_data:
+    name: anime_als_model_data
 
 
 # ============================================================

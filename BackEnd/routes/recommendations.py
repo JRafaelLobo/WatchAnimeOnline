@@ -9,7 +9,28 @@ recommendations_bp = Blueprint("recommendations", __name__)
 
 @recommendations_bp.get("/status")
 def status():
-    return jsonify({"ready": recommender.model_is_ready()}), 200
+    return jsonify(recommender.model_status()), 200
+
+
+@recommendations_bp.get("")
+def global_recommendations():
+    limit = max(1, min(request.args.get("limit", 10, type=int), 50))
+    try:
+        items = recommender.generate_global_recommendations(limit)
+    except Exception as error:
+        print(f"Error generando recomendaciones globales: {error}")
+        return jsonify({"error": "No se pudieron generar recomendaciones"}), 503
+    if items is None:
+        return jsonify({"error": "No hay datos suficientes para entrenar el modelo"}), 503
+    response = {
+        "mode": "global",
+        "requestedLimit": limit,
+        "returnedCount": len(items),
+        "recommendations": items
+    }
+    if len(items) < limit:
+        response["message"] = "El dataset actual no contiene suficientes animes distintos"
+    return jsonify(response), 200
 
 
 @recommendations_bp.post("/train")
@@ -30,7 +51,20 @@ def _recommendations(user_id):
         return jsonify({"error": "No se pudieron generar recomendaciones"}), 503
     if items is None:
         return jsonify({"error": "El modelo aún no está entrenado"}), 503
-    return jsonify({"userId": user_id, "recommendations": items}), 200
+    message = None
+    if not items:
+        message = "No hay animes nuevos disponibles para este usuario"
+    elif len(items) < limit:
+        message = "No hay suficientes animes nuevos para completar el límite solicitado"
+    response = {
+        "userId": user_id,
+        "requestedLimit": limit,
+        "returnedCount": len(items),
+        "recommendations": items
+    }
+    if message:
+        response["message"] = message
+    return jsonify(response), 200
 
 
 @recommendations_bp.get("/me")

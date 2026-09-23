@@ -20,6 +20,7 @@ from config.mongodb import (
     db,
     fs
 )
+from config.sqlserver import get_connection
 from services.jikan import get_anime
 
 
@@ -44,6 +45,27 @@ def _image_url(data):
     )
 
 
+def _catalog_image_url(anime_id):
+    connection = get_connection()
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT image_url FROM Animes WHERE anime_id = ?",
+            anime_id
+        )
+        row = cursor.fetchone()
+        cursor.close()
+    finally:
+        connection.close()
+
+    if not row or not row.image_url:
+        return None
+    return row.image_url.replace(
+        "myanimelist.cdn-dena.com",
+        "myanimelist.net"
+    )
+
+
 @media_bp.route(
     "/<int:anime_id>/image",
     methods=["GET"]
@@ -65,13 +87,13 @@ def anime_image(anime_id):
         except NoFile:
             db.anime_media.delete_one({"_id": stored["_id"]})
 
-    data, error = get_anime(anime_id)
-    if error:
-        return jsonify({"error": error}), 502
-
-    image_url = _image_url(data)
+    image_url = _catalog_image_url(anime_id)
+    error = None
     if not image_url:
-        return jsonify({"error": "El anime no tiene una imagen disponible"}), 404
+        data, error = get_anime(anime_id)
+        image_url = _image_url(data) if not error else None
+    if not image_url:
+        return jsonify({"error": error or "El anime no tiene una imagen disponible"}), 404 if not error else 502
 
     try:
         response = requests.get(image_url, timeout=IMAGE_TIMEOUT)

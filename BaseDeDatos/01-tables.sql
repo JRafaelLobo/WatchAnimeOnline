@@ -7,24 +7,6 @@ GO
 
 
 /* =========================================================
-   TABLA: ratings
-   ========================================================= */
-
-IF OBJECT_ID(N'dbo.ratings', N'U') IS NULL
-CREATE TABLE ratings
-(
-    userId      BIGINT NOT NULL,
-    movieId     BIGINT NOT NULL,
-   rating      FLOAT NOT NULL,
-    [timestamp] BIGINT NULL,
-
-    CONSTRAINT PK_ratings
-        PRIMARY KEY (userId, movieId)
-);
-GO
-
-
-/* =========================================================
    TABLA: Usuarios
    ========================================================= */
 

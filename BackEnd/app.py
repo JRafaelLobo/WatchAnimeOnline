@@ -134,6 +134,7 @@ OPENAPI_SPEC = {
         "/api/anime/season/now": {"get": {"responses": {"200": {"description": "Current season"}, "502": {"description": "External API error"}}}},
         "/api/anime/genres": {"get": {"responses": {"200": {"description": "Genres"}, "502": {"description": "External API error"}}}},
         "/api/anime/{anime_id}": {"get": {"parameters": [{"name": "anime_id", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 1}}], "responses": {"200": {"description": "Anime detail"}, "502": {"description": "External API error"}}}},
+        "/api/recommendations": {"get": {"summary": "Global recommendations", "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}}], "responses": {"200": {"description": "Recommendations aggregated from all user preferences"}, "503": {"description": "Insufficient training data"}}}},
         "/api/recommendations/status": {"get": {"responses": {"200": {"description": "Model status"}}}},
         "/api/recommendations/train": {"post": {"responses": {"200": {"description": "Model trained"}, "503": {"description": "Training unavailable"}}}},
         "/api/recommendations/me": {"get": {"security": [{"bearerAuth": []}], "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "maximum": 50}}], "responses": {"200": {"description": "Recommendations"}, "503": {"description": "Model unavailable"}}}},
@@ -197,6 +198,9 @@ def _complete_openapi_spec():
             "type": "object",
             "properties": {
                 "userId": {"type": "integer"},
+                "requestedLimit": {"type": "integer"},
+                "returnedCount": {"type": "integer"},
+                "message": {"type": "string"},
                 "recommendations": {"type": "array", "items": {"$ref": "#/components/schemas/Recommendation"}}
             }
         },
@@ -242,7 +246,7 @@ def _complete_openapi_spec():
             {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 25, "default": 12}}
         ]
     paths["/api/anime/genres"]["get"]["responses"]["502"] = {"description": "Jikan no disponible"}
-    paths["/api/recommendations/status"]["get"]["responses"]["200"] = {"description": "Estado del modelo", "content": {"application/json": {"schema": {"type": "object", "properties": {"ready": {"type": "boolean"}}}}}}
+    paths["/api/recommendations/status"]["get"]["responses"]["200"] = {"description": "Estado del modelo", "content": {"application/json": {"schema": {"type": "object", "properties": {"ready": {"type": "boolean"}, "source": {"type": "string", "nullable": True, "enum": ["trained", "trained_and_saved", "persisted"]}, "modelPath": {"type": "string"}, "availableItems": {"type": "integer"}}}}}}
     paths["/api/recommendations/{user_id}"]["get"]["parameters"].append({"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}})
     paths["/api/recommendations/{user_id}"]["get"]["responses"].update({"200": {"description": "Recomendaciones generadas", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecommendationsResponse"}}}}, "503": {"description": "Modelo no entrenado o no disponible"}})
     paths["/api/recommendations/me"]["get"]["responses"].update({"401": {"description": "JWT ausente o inválido"}})
