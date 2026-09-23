@@ -13,7 +13,7 @@
 <body>
   <div class="page">
     <header class="topbar">
-      <div class="brand">an<span>i</span>me atlas</div>
+      <div class="brand">WatchAn<span>i</span>meOnline</div>
       <form class="search" id="searchForm">
         <input id="searchInput" placeholder="Buscar anime..." aria-label="Buscar anime">
         <button type="submit" aria-label="Buscar">⌕</button>
@@ -32,16 +32,12 @@
       </div>
       <div class="slide-controls"><button id="previousSlide" aria-label="Anterior">‹</button><button id="nextSlide" aria-label="Siguiente">›</button></div>
     </section>
-
-    <div class="service-strip"><span>Catálogo público</span><span>Imágenes automáticas</span><span>Recomendaciones ALS</span><span>Sin login para explorar</span></div>
-
     <main class="content">
       <div class="section-heading"><h2>Trending</h2><span id="catalogStatus">Actualizado desde tu API</span></div>
       <div class="tabs"><button class="tab active" data-catalog="top">Tendencias</button><button class="tab" data-catalog="season">Temporada actual</button><button class="tab" data-catalog="search">Resultados</button></div>
       <div class="rail" id="animeRail"><div class="state">Cargando títulos...</div></div>
       <div class="lower-grid">
         <section class="info-panel"><h3>Recomendado por la comunidad</h3><p>El motor ALS aprende de los gustos de todos los usuarios y genera recomendaciones generales. No necesitás indicar un usuario.</p><div class="recommend-controls"><label for="recommendLimit">Cantidad</label><select id="recommendLimit"><option value="5">5</option><option value="10" selected>10</option><option value="20">20</option><option value="30">30</option></select><button class="recommend-action" id="recommendForm" type="button">Generar recomendaciones</button></div><div class="result-list" id="recommendationResults"><span>Generá una lista basada en los gustos aprendidos.</span></div></section>
-        <section class="info-panel"><h3>Portadas automáticas</h3><p>Las imágenes se obtienen automáticamente desde la API de anime al consultar cada título. No necesitás subir archivos ni iniciar sesión.</p><div class="api-note"><span class="status-dot online"></span><span>Imágenes servidas por la integración de catálogo</span></div></section>
       </div>
     </main>
     <footer class="footer">Anime Atlas · Flask API · Jikan · SQL Server · Spark ALS</footer>
