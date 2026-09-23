@@ -45,7 +45,7 @@ def register():
         cursor.execute(
             """
             SELECT id
-            FROM Usuarios
+            FROM auth_users
             WHERE email = ?
             """,
             email
@@ -60,7 +60,7 @@ def register():
 
         cursor.execute(
             """
-            INSERT INTO Usuarios (
+            INSERT INTO auth_users (
                 nombre,
                 email,
                 password_hash
@@ -123,7 +123,7 @@ def login():
                 nombre,
                 email,
                 password_hash
-            FROM Usuarios
+            FROM auth_users
             WHERE email = ?
             """,
             email
@@ -179,7 +179,7 @@ def me():
                 nombre,
                 email,
                 fecha_creacion
-            FROM Usuarios
+            FROM auth_users
             WHERE id = ?
             """,
             user_id

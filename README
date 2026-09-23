@@ -125,13 +125,27 @@ Authorization: Bearer TOKEN
 
 ## Microsoft SQL Server
 
-SQL Server funciona como base de datos relacional principal. La base utilizada por el proyecto es AnimeDB y almacena información estructurada como usuarios y ratings.
+SQL Server funciona como base de datos relacional principal. La base utilizada por el proyecto es AnimeDB y almacena la información importada por Apache Hop en `Usuarios`, `Animes` y `Reviews`.
 
-La estructura de ratings conserva:
-- userId
-- movieId
-- rating
-- timestamp
+Las valoraciones importadas se almacenan en `Reviews` con las columnas:
+- `user_id`
+- `anime_id`
+- `my_score`
+
+La tabla `ratings` se conserva por compatibilidad con el diseño inicial, pero
+no es la fuente usada por el backend actual porque queda vacía en el pipeline
+de Apache Hop.
+
+Al ejecutar Docker Compose, el servicio `database-init` ejecuta
+`BaseDeDatos/01-tables.sql` después de que SQL Server esté saludable.
+El script es idempotente: crea `ratings`, `Usuarios`, `Animes`, `Reviews`
+y `auth_users` solamente si no existen. Si encuentra la tabla de
+autenticación antigua `Usuarios`, la conserva como `Usuarios_legacy` antes
+de crear la estructura usada por Apache Hop.
+
+`Usuarios`, `Animes` y `Reviews` son tablas del proceso ETL. Las credenciales
+de la API se almacenan separadamente en `auth_users`, para no interferir con
+los inserts de Apache Hop.
 
 ## Apache Hop
 
@@ -149,10 +163,12 @@ ApacheHop/workflows/
 
 El sistema recomendador utiliza Apache Spark, PySpark y ALS (Alternating Least Squares).
 
-PySpark obtiene los ratings almacenados en SQL Server. ALS utiliza las interacciones entre usuarios e ítems para construir un modelo y producir recomendaciones personalizadas.
+PySpark obtiene las valoraciones de `Reviews` en SQL Server. El backend las
+proyecta a `userId`, `movieId` y `rating` para que ALS utilice las interacciones
+entre usuarios y anime.
 
 Flujo:
-SQL Server -> ratings -> PySpark -> ALS -> modelo -> recomendaciones -> Flask API -> Frontend
+SQL Server.Reviews -> PySpark -> ALS -> modelo -> recomendaciones -> Flask API -> Frontend
 
 ## API Externa de Anime
 
@@ -177,6 +193,7 @@ Los componentes principales se ejecutan utilizando contenedores Docker.
 Servicios:
 - sqlserver
 - mongodb
+- database-init
 - backend
 - frontend
 - apache-hop
@@ -212,6 +229,10 @@ docker compose build
 Levantar servicios:
 docker compose up -d
 
+El servicio `database-init` termina con estado `Exited (0)` después de aplicar
+el esquema; esto es esperado. Backend y frontend esperan a que finalice
+correctamente.
+
 Consultar estado:
 docker compose ps
 
@@ -242,7 +263,7 @@ ADVERTENCIA: docker compose down -v elimina los volúmenes y puede borrar los da
 6. El usuario consulta información de anime mediante las APIs.
 7. Flask consulta información externa cuando corresponde.
 8. Imágenes y PDF pueden almacenarse en MongoDB/GridFS.
-9. PySpark obtiene ratings desde SQL Server.
+9. PySpark obtiene valoraciones desde `Reviews` en SQL Server.
 10. ALS entrena el modelo recomendador.
 11. El usuario solicita recomendaciones.
 12. Flask devuelve los resultados al Frontend.

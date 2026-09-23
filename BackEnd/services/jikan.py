@@ -19,10 +19,17 @@ def _request(path, params=None):
 
         response.raise_for_status()
 
-        return response.json(), None
+        data = response.json()
+        if not isinstance(data, dict):
+            return None, "La API externa devolvió una respuesta inválida"
+
+        return data, None
 
     except requests.exceptions.Timeout:
         return None, "La API externa tardó demasiado en responder"
+
+    except ValueError:
+        return None, "La API externa devolvió JSON inválido"
 
     except requests.exceptions.RequestException as error:
         print(f"Error Jikan: {error}")

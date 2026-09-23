@@ -79,6 +79,33 @@ services:
 
 
   # ==========================================================
+  # SQL SCHEMA INITIALIZATION
+  # ==========================================================
+
+  database-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: anime_database_init
+    environment:
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    volumes:
+      - ./BaseDeDatos/01-tables.sql:/init/01-tables.sql:ro
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - anime_network
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        set -e;
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa
+        -P "$${MSSQL_SA_PASSWORD}" -C
+        -Q "IF DB_ID(N'AnimeDB') IS NULL CREATE DATABASE [AnimeDB]";
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa
+        -P "$${MSSQL_SA_PASSWORD}" -C -d AnimeDB -i /init/01-tables.sql
+
+
+  # ==========================================================
   # BACKEND
   # Flask + PySpark + ALS
   # ==========================================================
@@ -114,6 +141,9 @@ services:
 
       mongodb:
         condition: service_healthy
+
+      database-init:
+        condition: service_completed_successfully
 
     networks:
       - anime_network
@@ -182,6 +212,9 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+
+      database-init:
+        condition: service_completed_successfully
 
     networks:
       - anime_network
