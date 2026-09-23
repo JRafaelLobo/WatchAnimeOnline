@@ -1,4 +1,5 @@
 from bson import ObjectId
+import requests
 
 from flask import (
     Blueprint,
@@ -19,12 +20,88 @@ from config.mongodb import (
     db,
     fs
 )
+from services.jikan import get_anime
 
 
 media_bp = Blueprint(
     "media",
     __name__
 )
+
+IMAGE_TIMEOUT = 15
+
+
+def _image_url(data):
+    anime = data.get("data", data) if isinstance(data, dict) else {}
+    images = anime.get("images", {})
+    jpg = images.get("jpg", {})
+    webp = images.get("webp", {})
+    return (
+        jpg.get("large_image_url")
+        or jpg.get("image_url")
+        or webp.get("large_image_url")
+        or webp.get("image_url")
+    )
+
+
+@media_bp.route(
+    "/<int:anime_id>/image",
+    methods=["GET"]
+)
+def anime_image(anime_id):
+    stored = db.anime_media.find_one({
+        "animeId": anime_id,
+        "source": "jikan"
+    })
+
+    if stored:
+        try:
+            grid_file = fs.get(stored["fileId"])
+            return Response(
+                grid_file,
+                content_type=grid_file.content_type or "image/jpeg",
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
+        except NoFile:
+            db.anime_media.delete_one({"_id": stored["_id"]})
+
+    data, error = get_anime(anime_id)
+    if error:
+        return jsonify({"error": error}), 502
+
+    image_url = _image_url(data)
+    if not image_url:
+        return jsonify({"error": "El anime no tiene una imagen disponible"}), 404
+
+    try:
+        response = requests.get(image_url, timeout=IMAGE_TIMEOUT)
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "image/jpeg").split(";")[0]
+        if not content_type.startswith("image/"):
+            return jsonify({"error": "La imagen externa no tiene un formato válido"}), 502
+
+        file_id = fs.put(
+            response.content,
+            filename=f"anime-{anime_id}.jpg",
+            contentType=content_type,
+            metadata={"animeId": anime_id, "source": "jikan", "sourceUrl": image_url}
+        )
+        db.anime_media.update_one(
+            {"animeId": anime_id, "source": "jikan"},
+            {"$set": {"fileId": file_id, "filename": f"anime-{anime_id}.jpg", "contentType": content_type, "source": "jikan"}},
+            upsert=True
+        )
+        return Response(
+            response.content,
+            content_type=content_type,
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+    except requests.exceptions.RequestException as request_error:
+        print(f"Error descargando imagen de Jikan: {request_error}")
+        return jsonify({"error": "No se pudo descargar la imagen del anime"}), 502
+    except Exception as error:
+        print(f"Error guardando imagen en MongoDB: {error}")
+        return jsonify({"error": "No se pudo guardar la imagen en MongoDB"}), 503
 
 
 ALLOWED_CONTENT_TYPES = {

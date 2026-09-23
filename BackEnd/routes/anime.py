@@ -7,6 +7,11 @@ from services.jikan import (
     get_top_anime,
     search_anime
 )
+from services.catalog import (
+    anime_detail as local_anime_detail,
+    search_anime as local_search_anime,
+    top_anime as local_top_anime
+)
 
 
 anime_bp = Blueprint(
@@ -50,9 +55,11 @@ def anime_search():
     )
 
     if error:
-        return jsonify({
-            "error": error
-        }), 502
+        try:
+            return jsonify(local_search_anime(query, page, limit)), 200
+        except Exception as local_error:
+            print(f"Error catálogo local: {local_error}")
+            return jsonify({"error": error}), 502
 
     return jsonify(data), 200
 
@@ -78,9 +85,11 @@ def anime_top():
     )
 
     if error:
-        return jsonify({
-            "error": error
-        }), 502
+        try:
+            return jsonify(local_top_anime(page, limit)), 200
+        except Exception as local_error:
+            print(f"Error catálogo local: {local_error}")
+            return jsonify({"error": error}), 502
 
     return jsonify(data), 200
 
@@ -106,9 +115,11 @@ def anime_season_now():
     )
 
     if error:
-        return jsonify({
-            "error": error
-        }), 502
+        try:
+            return jsonify(local_top_anime(page, limit)), 200
+        except Exception as local_error:
+            print(f"Error catálogo local: {local_error}")
+            return jsonify({"error": error}), 502
 
     return jsonify(data), 200
 
@@ -118,9 +129,7 @@ def anime_genres():
     data, error = get_genres()
 
     if error:
-        return jsonify({
-            "error": error
-        }), 502
+        return jsonify({"error": error}), 502
 
     return jsonify(data), 200
 
@@ -130,8 +139,9 @@ def anime_detail(anime_id):
     data, error = get_anime(anime_id)
 
     if error:
-        return jsonify({
-            "error": error
-        }), 502
+        local_data = local_anime_detail(anime_id)
+        if local_data:
+            return jsonify(local_data), 200
+        return jsonify({"error": error}), 502
 
     return jsonify(data), 200
