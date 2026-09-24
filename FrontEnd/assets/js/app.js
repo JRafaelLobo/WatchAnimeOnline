@@ -125,13 +125,38 @@ $('#recommendForm').addEventListener('click', async () => {
     const limit = Number($('#recommendLimit').value);
     const result = await request(`/recommendations?limit=${limit}`);
     const recommendations = result.recommendations || [];
-    resultList.innerHTML = recommendations.length
-      ? `<div class="recommendation-summary">${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles</div>${recommendations.map((item) => `<div class="result-item"><strong>${item.title || `Anime #${item.movieId}`}</strong><small>#${item.movieId}</small><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')}`
-      : `<span>${result.message || 'No hay recomendaciones disponibles.'}</span>`;
-    resultList.querySelectorAll('[data-anime-id]').forEach((link) => link.addEventListener('click', (clickEvent) => {
-      clickEvent.preventDefault();
-      showDetail(link.dataset.animeId);
-    }));
+    resultList.replaceChildren();
+    if (!recommendations.length) {
+      resultList.textContent = result.message || 'No hay recomendaciones disponibles.';
+      return;
+    }
+    const summary = document.createElement('div');
+    summary.className = 'recommendation-summary';
+    summary.textContent = `${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles`;
+    const rail = document.createElement('div');
+    rail.className = 'rail';
+    rail.tabIndex = 0;
+    rail.setAttribute('role', 'region');
+    rail.setAttribute('aria-label', 'Recomendaciones de la comunidad');
+    recommendations.forEach((item) => {
+      const card = createCard({
+        ...item,
+        title: item.title || `Anime #${item.movieId}`,
+        score: item.predictedRating.toFixed(2),
+      });
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `Ver detalle de ${item.title || `Anime #${item.movieId}`}`);
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          card.click();
+        }
+      });
+      rail.appendChild(card);
+    });
+    resultList.appendChild(summary);
+    resultList.appendChild(rail);
   } catch (error) { if (!error.silent) toast(error.message); }
 });
 
