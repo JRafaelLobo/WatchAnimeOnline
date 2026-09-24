@@ -118,10 +118,39 @@ DELETE /api/media/file/<file_id>
 
 ## Autenticación
 
-El sistema permite registro e inicio de sesión. Las contraseñas se almacenan mediante hash y el acceso a rutas protegidas utiliza tokens JWT.
+Al abrir el frontend en `http://localhost:3000` se muestra la pantalla de
+ingreso. Es obligatorio ingresar o crear una cuenta para acceder al catálogo,
+las búsquedas y las recomendaciones; no existe acceso como invitado.
 
-Las peticiones protegidas deben enviar:
+Para crear una cuenta se solicitan nombre (hasta 100 caracteres), correo
+(hasta 255 caracteres), contraseña (de 8 a 128 caracteres) y confirmación.
+El backend guarda el usuario en `AnimeDB.dbo.auth_users`, con contraseña
+hasheada y fecha de creación. Un correo ya registrado no puede duplicarse.
+El registro inicia sesión automáticamente.
+
+La sesión se conserva al recargar mediante una cookie HttpOnly y vence a las
+8 horas. Las peticiones que modifican datos incluyen protección CSRF. El botón
+«Cerrar sesión» elimina las cookies y vuelve a la pantalla de ingreso.
+El catálogo, las recomendaciones y los archivos también requieren autenticación
+en la API. Las recomendaciones siguen siendo generales para todos: las cuentas
+de acceso no se vinculan con los usuarios del dataset ni modifican el modelo ALS.
+
+Después de actualizar el código, reconstruir los dos servicios web:
+
+```sh
+docker compose up -d --build backend frontend
+```
+
+El esquema existente ya incluye `auth_users`; no hace falta modificar las
+tablas del ETL. Los datos de los usuarios persisten en el volumen de SQL Server.
+
+Los clientes de la API también pueden seguir usando el token JWT devuelto en
+`accessToken`. Las peticiones protegidas deben enviar:
+
 Authorization: Bearer TOKEN
+
+Endpoints de sesión: `POST /api/auth/register`, `POST /api/auth/login`,
+`GET /api/auth/me` y `POST /api/auth/logout`.
 
 ## Microsoft SQL Server
 

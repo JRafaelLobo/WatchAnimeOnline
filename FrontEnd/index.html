@@ -8,10 +8,104 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+  <script src="assets/js/auth.js" defer></script>
   <script src="assets/js/app.js" defer></script>
 </head>
 <body>
-  <div class="page">
+  <main class="auth-view" id="authView" aria-label="Acceso a WatchAnimeOnline">
+    <section class="auth-story" aria-labelledby="storyTitle">
+      <a class="auth-brand" href="#" aria-label="WatchAnimeOnline, inicio">
+        <span class="auth-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m9 5 10 7-10 7V5Z" fill="currentColor"/><path d="M5 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <span>WatchAn<span class="auth-brand-accent">i</span>meOnline<span class="auth-brand-caption">UN MUNDO POR DESCUBRIR</span></span>
+      </a>
+      <div class="auth-story-copy">
+        <p class="auth-eyebrow"><span></span> PARA LOS QUE VIVEN LAS HISTORIAS</p>
+        <h1 id="storyTitle">Un nuevo mundo.<br>Tu próxima <em>obsesión.</em></h1>
+        <p>Ese anime que no podés dejar de ver.<br>Encontralo acá.</p>
+      </div>
+      <svg class="auth-landscape" viewBox="0 0 720 800" preserveAspectRatio="xMidYMid slice" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="authSky" x1="360" y1="0" x2="360" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#24233f"/><stop offset=".52" stop-color="#4e3d6d"/><stop offset="1" stop-color="#c17fa1"/></linearGradient>
+          <linearGradient id="authMountain" x1="410" y1="430" x2="410" y2="740" gradientUnits="userSpaceOnUse"><stop stop-color="#655886"/><stop offset="1" stop-color="#312c50"/></linearGradient>
+          <linearGradient id="authWater" x1="360" y1="625" x2="360" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5c85"/><stop offset="1" stop-color="#29263f"/></linearGradient>
+          <linearGradient id="authMoon" x1="520" y1="235" x2="550" y2="395" gradientUnits="userSpaceOnUse"><stop stop-color="#fff4df"/><stop offset="1" stop-color="#eebdcf"/></linearGradient>
+          <radialGradient id="authMoonGlow"><stop stop-color="#e8b6d2" stop-opacity=".27"/><stop offset="1" stop-color="#e8b6d2" stop-opacity="0"/></radialGradient>
+          <linearGradient id="authArtShade" x1="0" y1="0" x2="0" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#24233f"/><stop offset=".32" stop-color="#24233f" stop-opacity=".9"/><stop offset=".55" stop-color="#24233f" stop-opacity="0"/><stop offset=".84" stop-color="#24233f" stop-opacity="0"/><stop offset="1" stop-color="#211e35" stop-opacity=".9"/></linearGradient>
+        </defs>
+        <path fill="url(#authSky)" d="M0 0h720v800H0z"/>
+        <circle cx="518" cy="348" r="172" fill="url(#authMoonGlow)"/>
+        <circle cx="518" cy="348" r="69" fill="url(#authMoon)"/>
+        <circle cx="497" cy="325" r="15" fill="#dba9c3" opacity=".15"/>
+        <circle cx="542" cy="371" r="22" fill="#dba9c3" opacity=".18"/>
+        <g fill="#f9dfed"><circle cx="94" cy="384" r="1.4"/><circle cx="320" cy="359" r="1.2"/><circle cx="403" cy="284" r="1.5"/><circle cx="643" cy="258" r="1.4"/><circle cx="603" cy="441" r="1.2"/><circle cx="242" cy="423" r="1.4"/><circle cx="180" cy="324" r="1"/><circle cx="642" cy="365" r="1"/></g>
+        <path d="m380 281 2.5 7.5 7.5 2.5-7.5 2.5-2.5 7.5-2.5-7.5-7.5-2.5 7.5-2.5 2.5-7.5Z" fill="#f7d5e4"/>
+        <path d="M0 567 131 472l70 57 144-123 112 108 92-59 171 115v163H0V567Z" fill="#72608a"/>
+        <path d="m241 520 104-114 112 108-63-26-42-41-35 42-76 31Z" fill="#d6afc5" opacity=".55"/>
+        <path d="m0 581 135-71 122 95 173-98 136 83 154-100v256H0V581Z" fill="url(#authMountain)"/>
+        <path d="M0 637c101-31 149-16 229 4 108 27 177-54 268-17 90 35 147-23 223-17v193H0V637Z" fill="url(#authWater)"/>
+        <g stroke="#ecc2cf" stroke-linecap="round" opacity=".3"><path d="M461 653h105M481 661h59M445 670h110M474 681h98M443 696h103M478 712h68M419 730h133M469 747h106M354 766h122"/><path d="M65 674h125M119 689h65M264 710h59M78 739h94" opacity=".6"/></g>
+        <path d="M0 588c58-11 105 31 134 41 56 20 107 0 168 37l-61 23c-93-22-129-11-168-7L0 703V588Z" fill="#28283f"/>
+        <path d="M720 662c-90-25-175 7-245 63l-98 75h343V662Z" fill="#252539"/>
+        <path d="M720 704c-98-12-158 20-209 40l-81 56h290v-96Z" fill="#1c1e30"/>
+        <g fill="#252139">
+          <path d="m149 459 13-3 8 210-19-3-2-204ZM278 457l14 3-5 208-20-1 11-210Z"/>
+          <path d="M119 449c57 11 136 12 199-1l-4 16c-59 9-131 9-190-1l-5-14Z"/>
+          <path d="M114 438c75 18 148 19 210-1l-5 14c-64 18-136 16-200 0l-5-13Z"/>
+          <path d="M143 487h152v10H143zM214 463h12v30h-12z"/>
+          <path d="m141 661 35 1 1 8-37-1 1-8Zm120 0 36 1v8l-37-1 1-8Z"/>
+        </g>
+        <path d="M0 339c49 40 37 112 60 146 28 43 62 51 78 128l-20-3c-3-48-31-71-57-93C11 474 32 415 0 390v-51Z" fill="#282238"/>
+        <path d="M32 427c31-20 79-30 140-7M62 498c-17-36-47-51-62-49m69 60c46-45 61-45 98-45" stroke="#282238" stroke-width="8"/>
+        <g fill="#d697b9"><ellipse cx="14" cy="341" rx="43" ry="21"/><ellipse cx="47" cy="364" rx="49" ry="24"/><ellipse cx="19" cy="394" rx="58" ry="23"/><ellipse cx="97" cy="400" rx="42" ry="22"/><ellipse cx="145" cy="416" rx="46" ry="17"/><ellipse cx="38" cy="444" rx="47" ry="24"/><ellipse cx="125" cy="460" rx="40" ry="16"/><ellipse cx="169" cy="468" rx="32" ry="14"/></g>
+        <g fill="#eab2cd"><ellipse cx="23" cy="330" rx="29" ry="12"/><ellipse cx="57" cy="352" rx="27" ry="10"/><ellipse cx="89" cy="389" rx="32" ry="10"/><ellipse cx="148" cy="404" rx="29" ry="9"/><ellipse cx="13" cy="431" rx="33" ry="12"/><ellipse cx="132" cy="453" rx="24" ry="8"/></g>
+        <g fill="#efb6cf" opacity=".8"><path d="m218 442 6 2-2 6-5-3 1-5Zm-14 93 5-2 4 5-5 2-4-5Zm-106 27 6 1-2 5-4-1v-5Zm223 36 5-4 3 5-5 3-3-4Zm-124 29 5 1-2 6-5-3 2-4Z"/></g>
+        <path d="M560 728c15-17 28-19 46-21m-46 21c11-33 13-42 8-55m14 41c20-28 34-31 47-36M663 716c-3-32 6-55 19-70m-14 52c14-17 29-21 41-20" stroke="#181c2c" stroke-width="5" stroke-linecap="round"/>
+        <path fill="url(#authArtShade)" d="M0 0h720v800H0z"/>
+      </svg>
+      <div class="auth-story-footer"><span class="auth-story-tag"><span aria-hidden="true">✦</span> Tu siguiente capítulo te espera</span><span class="auth-art-caption">DESCUBRÍ · EXPLORÁ · DISFRUTÁ</span></div>
+    </section>
+
+    <section class="auth-access" aria-labelledby="authTitle">
+      <div class="auth-form-wrap">
+        <div class="auth-welcome"><span aria-hidden="true">✦</span> TU ESPACIO ANIME</div>
+        <div class="auth-mode" role="group" aria-label="Elegir cómo acceder">
+          <button class="is-active" type="button" id="loginTab" aria-pressed="true">Ingresar</button>
+          <button type="button" id="registerTab" aria-pressed="false">Crear cuenta</button>
+        </div>
+        <h2 id="authTitle">Qué bueno verte.</h2>
+        <p class="auth-subtitle" id="authSubtitle">Ingresá a tu cuenta y encontrá tu próxima historia favorita.</p>
+        <noscript><p class="auth-message">Activá JavaScript en tu navegador para crear tu cuenta e ingresar.</p></noscript>
+        <form id="authForm" class="auth-form" method="post">
+          <div class="auth-message" id="authMessage" role="status" aria-live="polite" hidden></div>
+          <fieldset id="authFields">
+            <div class="auth-field" id="nameField" hidden>
+              <label for="authName">Tu nombre</label>
+              <div class="auth-input-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg><input id="authName" name="nombre" placeholder="¿Cómo te llamás?" maxlength="100" autocomplete="name" disabled></div>
+            </div>
+            <div class="auth-field">
+              <label for="authEmail">Correo electrónico</label>
+              <div class="auth-input-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><input id="authEmail" name="email" type="email" placeholder="tu@correo.com" required maxlength="255" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+            </div>
+            <div class="auth-field">
+              <label for="authPassword">Contraseña</label>
+              <div class="auth-input-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><input id="authPassword" name="password" type="password" placeholder="Tu contraseña" required maxlength="128" autocomplete="current-password" aria-describedby="passwordHint"><button class="auth-password-toggle" id="togglePassword" type="button" aria-label="Mostrar contraseña" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+              <p class="auth-field-hint" id="passwordHint" hidden>Usá al menos 8 caracteres.</p>
+            </div>
+            <div class="auth-field" id="confirmField" hidden>
+              <label for="authConfirmPassword">Confirmá tu contraseña</label>
+              <div class="auth-input-wrap"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-7 6 2 2 4-4"/></svg><input id="authConfirmPassword" name="password_confirmation" type="password" placeholder="Repetí tu contraseña" maxlength="128" autocomplete="new-password" disabled></div>
+            </div>
+            <button class="auth-submit" type="submit" id="authSubmit"><span id="authSubmitLabel">Ingresar</span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          </fieldset>
+        </form>
+        <p class="auth-switch"><span id="authSwitchPrompt">¿Todavía no tenés cuenta?</span> <button id="authSwitch" type="button">Creá una gratis</button></p>
+        <div class="auth-footnote"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 8 3v6c0 4-5 8-8 9-3-1-8-5-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><span>Un solo lugar para descubrir todas tus historias.</span></div>
+      </div>
+      <p class="auth-access-footer">Hecho para fans. Como vos. <span aria-hidden="true">✧</span></p>
+    </section>
+  </main>
+  <div class="page" id="appPage" hidden inert>
     <header class="topbar">
       <div class="brand">WatchAn<span>i</span>meOnline</div>
       <form class="search" id="searchForm">
@@ -19,6 +113,11 @@
         <button type="submit" aria-label="Buscar">⌕</button>
       </form>
       <div class="api-status"><span class="status-dot" id="apiStatusDot"></span><span id="apiStatus">Conectando API...</span></div>
+      <div class="account-menu">
+        <span class="account-avatar" id="userAvatar" aria-hidden="true">A</span>
+        <span class="account-name" id="userName"></span>
+        <button class="account-logout" id="logoutButton" type="button" aria-label="Cerrar sesión"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5m5-13 5 5-5 5m-7-5h12"/></svg><span>Salir</span></button>
+      </div>
     </header>
 
     <section class="hero">
@@ -26,7 +125,7 @@
       <div class="hero-content">
         <div class="hero-kicker">Presentación destacada</div>
         <h1 id="heroTitle">Cargando tu próxima historia</h1>
-        <div class="hero-meta"><span id="heroYear">Anime Atlas</span><i></i><span id="heroType">Explorá sin registro</span><i></i><b id="heroScore">★ 8.8</b></div>
+        <div class="hero-meta"><span id="heroYear">Anime Atlas</span><i></i><span id="heroType">Descubrí nuevas historias</span><i></i><b id="heroScore">★ 8.8</b></div>
         <p class="hero-copy" id="heroCopy">Descubrí títulos populares, novedades y recomendaciones conectadas con tu backend.</p>
         <div class="actions"><button class="watch" id="watchButton">▶ Ver ahora</button><button class="detail" id="heroDetail">Detalle ›</button></div>
       </div>
