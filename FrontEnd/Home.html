@@ -54,11 +54,13 @@
     }
 
     .btn {
+      display: inline-block;
       padding: 8px 16px;
       border-radius: 4px;
       border: none;
       cursor: pointer;
       font-weight: 600;
+      text-decoration: none;
       transition: background 0.2s;
     }
 
@@ -193,8 +195,7 @@
   <header>
     <div class="logo">AnimeStream</div>
     <div class="nav-user">
-      <button class="btn btn-login">Iniciar Sesión</button>
-      <button class="btn btn-register">Registrarse</button>
+      <button class="btn btn-login" id="logout-button" type="button">Cerrar sesión</button>
     </div>
   </header>
 
@@ -298,6 +299,12 @@
     document.addEventListener('DOMContentLoaded', () => {
       fetchPopularAnime();
       fetchMyRecommendations();
+
+      document.getElementById('logout-button').addEventListener('click', () => {
+        sessionStorage.removeItem('animeStreamPendingUser');
+        localStorage.removeItem('animeStreamToken');
+        window.location.href = 'Login.html';
+      });
     });
   </script>
 </body>
