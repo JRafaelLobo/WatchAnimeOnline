@@ -5,7 +5,8 @@ const $ = (selector) => document.querySelector(selector);
 const animeTitle = (anime) => anime?.title || anime?.title_english || 'Anime sin título';
 const animeImage = (anime) => `${API}/media/${anime.mal_id || anime.movieId}/image`;
 
-const request = (path) => AnimeAuth.request(path);
+// The login gates this page; the shared catalogue keeps its original API flow.
+const request = (path) => AnimeAuth.request(path, { credentials: 'omit' });
 
 function toast(message) {
   const element = $('#toast');

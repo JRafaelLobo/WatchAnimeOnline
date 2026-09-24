@@ -119,20 +119,23 @@ DELETE /api/media/file/<file_id>
 ## Autenticación
 
 Al abrir el frontend en `http://localhost:3000` se muestra la pantalla de
-ingreso. Es obligatorio ingresar o crear una cuenta para acceder al catálogo,
+ingreso. Es obligatorio iniciar sesión para acceder desde la web al catálogo,
 las búsquedas y las recomendaciones; no existe acceso como invitado.
 
 Para crear una cuenta se solicitan nombre (hasta 100 caracteres), correo
 (hasta 255 caracteres), contraseña (de 8 a 128 caracteres) y confirmación.
 El backend guarda el usuario en `AnimeDB.dbo.auth_users`, con contraseña
 hasheada y fecha de creación. Un correo ya registrado no puede duplicarse.
-El registro inicia sesión automáticamente.
+Después del registro se vuelve al formulario de ingreso, con el correo ya
+completado. Crear una cuenta no inicia sesión: es necesario ingresar la contraseña
+y pulsar «Ingresar».
 
 La sesión se conserva al recargar mediante una cookie HttpOnly y vence a las
-8 horas. Las peticiones que modifican datos incluyen protección CSRF. El botón
+8 horas. Las peticiones protegidas con cookies incluyen protección CSRF. El botón
 «Cerrar sesión» elimina las cookies y vuelve a la pantalla de ingreso.
-El catálogo, las recomendaciones y los archivos también requieren autenticación
-en la API. Las recomendaciones siguen siendo generales para todos: las cuentas
+El login actúa como paso previo en la interfaz; los endpoints del catálogo,
+las recomendaciones generales y las imágenes conservan su comportamiento original.
+Las recomendaciones siguen siendo generales para todos: las cuentas
 de acceso no se vinculan con los usuarios del dataset ni modifican el modelo ALS.
 
 Después de actualizar el código, reconstruir los dos servicios web:

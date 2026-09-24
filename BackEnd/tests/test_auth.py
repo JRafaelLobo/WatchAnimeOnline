@@ -18,7 +18,7 @@ from werkzeug.security import check_password_hash
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app as application
-from routes import auth, media
+from routes import anime, auth, media
 from services import recommender
 
 
@@ -131,7 +131,13 @@ def register(client, **overrides):
     })
 
 
-def test_registration_persists_normalized_credentials_and_starts_session(client, app, database):
+def login(client, **overrides):
+    return client.post("/api/auth/login", json={
+        "email": "akira@example.com", "password": "my-password-123", **overrides,
+    })
+
+
+def test_registration_persists_credentials_but_requires_separate_login(client, app, database):
     response = register(client)
     assert response.status_code == 201
     payload = response.get_json()
@@ -143,6 +149,15 @@ def test_registration_persists_normalized_credentials_and_starts_session(client,
     assert database.connections[0].committed
     assert database.connections[0].closed and database.connections[0].active_cursor.closed
     assert all("auth_users" in statement for statement, _ in database.statements)
+    assert "accessToken" not in payload and "expiresAt" not in payload
+    assert not response.headers.getlist("Set-Cookie")
+    assert client.get("/api/auth/me").status_code == 401
+    assert client.get_cookie("access_token_cookie", path="/api/") is None
+    assert response.headers["Cache-Control"] == "no-store"
+
+    response = login(client)
+    assert response.status_code == 200
+    payload = response.get_json()
     with app.app_context():
         token = decode_token(payload["accessToken"])
     assert token["sub"] == "1"
@@ -239,6 +254,7 @@ def test_registration_database_failures_are_json_and_cleanup(client, database, f
 @pytest.mark.parametrize("endpoint", ["login", "me"])
 def test_login_and_session_database_failures_return_json(client, database, endpoint):
     register(client)
+    login(client)
     database.connect_error = pyodbc.OperationalError("SQL unavailable")
     if endpoint == "login":
         response = client.post("/api/auth/login", json={"email": "akira@example.com", "password": "password"})
@@ -250,6 +266,7 @@ def test_login_and_session_database_failures_return_json(client, database, endpo
 
 def test_deleted_user_cannot_restore_a_session(client, database):
     register(client)
+    login(client)
     database.users.clear()
     response = client.get("/api/auth/me")
     assert response.status_code == 401
@@ -258,15 +275,10 @@ def test_deleted_user_cannot_restore_a_session(client, database):
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/anime/top"), ("GET", "/api/anime/search?q=naruto"),
-    ("GET", "/api/anime/season/now"), ("GET", "/api/anime/genres"), ("GET", "/api/anime/1"),
-    ("GET", "/api/recommendations"), ("GET", "/api/recommendations/status"),
-    ("GET", "/api/recommendations/1"), ("GET", "/api/recommendations/me"),
-    ("POST", "/api/recommendations/train"), ("GET", "/api/media/1"),
-    ("POST", "/api/media/1"), ("GET", "/api/media/1/image"),
-    ("GET", "/api/media/file/123"), ("DELETE", "/api/media/file/123"), ("GET", "/api/auth/me"),
+    ("GET", "/api/recommendations/me"), ("POST", "/api/media/1"),
+    ("DELETE", "/api/media/file/123"), ("GET", "/api/auth/me"),
 ])
-def test_application_endpoints_require_login(client, method, path):
+def test_original_protected_endpoints_still_require_login(client, method, path):
     response = client.open(path, method=method)
     assert response.status_code == 401
     assert response.get_json()["error"] == "Inicia sesión para continuar"
@@ -274,22 +286,17 @@ def test_application_endpoints_require_login(client, method, path):
 
 def test_cookies_allow_protected_get_and_csrf_protects_mutations(client, monkeypatch):
     register(client)
-    monkeypatch.setattr(recommender, "model_status", lambda: {"ready": True})
-    train = Mock(return_value={"ready": True})
-    monkeypatch.setattr(recommender, "train_model", train)
-    response = client.get("/api/recommendations/status")
+    login(client)
+    response = client.get("/api/auth/me")
     assert response.status_code == 200
-    assert response.headers["Cache-Control"] == "private, no-store"
-    assert client.post("/api/recommendations/train").status_code == 401
-    train.assert_not_called()
+    assert client.post("/api/media/1").status_code == 401
     csrf = client.get_cookie("csrf_access_token").value
-    response = client.post("/api/recommendations/train", headers={"X-CSRF-TOKEN": csrf})
-    assert response.status_code == 200
-    train.assert_called_once_with()
+    response = client.post("/api/media/1", headers={"X-CSRF-TOKEN": csrf})
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Debe enviar un archivo en el campo file"
 
 
-def test_cookie_session_loads_media_images_without_bearer_header(client, monkeypatch):
-    register(client)
+def test_existing_media_images_remain_accessible_without_auth_headers(client, monkeypatch):
     monkeypatch.setattr(media, "db", SimpleNamespace(anime_media=SimpleNamespace(
         find_one=Mock(return_value={"fileId": "cached-file"}),
     )))
@@ -300,14 +307,14 @@ def test_cookie_session_loads_media_images_without_bearer_header(client, monkeyp
     assert response.status_code == 200
     assert response.content_type == "image/png"
     assert response.data == b"cached-image-bytes"
-    assert response.headers["Cache-Control"] == "private, no-store"
+    assert response.headers["Cache-Control"] == "public, max-age=3600"
 
 
 def test_bearer_tokens_remain_compatible(app, client, monkeypatch):
-    token = register(client).get_json()["accessToken"]
-    monkeypatch.setattr(recommender, "model_status", lambda: {"ready": True})
+    register(client)
+    token = login(client).get_json()["accessToken"]
     browser = app.test_client()
-    response = browser.get("/api/recommendations/status", headers={"Authorization": f"Bearer {token}"})
+    response = browser.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
 
 
@@ -315,22 +322,26 @@ def test_recommendations_remain_global_for_different_accounts(client, app, monke
     expected = [{"movieId": 1, "title": "Anime", "predictedRating": 8.5}]
     generate = Mock(return_value=expected)
     monkeypatch.setattr(recommender, "generate_global_recommendations", generate)
+    original = client.get("/api/recommendations?limit=1").get_json()
     register(client)
+    login(client)
     first = client.get("/api/recommendations?limit=1").get_json()
     second_browser = app.test_client()
     register(second_browser, email="second@example.com")
+    login(second_browser, email="second@example.com")
     second = second_browser.get("/api/recommendations?limit=1").get_json()
-    assert first == second
+    assert original == first == second
     assert first["mode"] == "global" and first["recommendations"] == expected
     assert all(call.args == (1,) for call in generate.call_args_list)
 
 
 def test_logout_clears_session_and_rejects_subsequent_protected_requests(client):
     register(client)
+    login(client)
     assert client.post("/api/auth/logout").status_code == 200
     assert client.get_cookie("access_token_cookie", path="/api/") is None
     assert client.get_cookie("csrf_access_token") is None
-    assert client.get("/api/recommendations/status").status_code == 401
+    assert client.get("/api/auth/me").status_code == 401
     assert client.post("/api/auth/logout").status_code == 200
 
 
@@ -338,7 +349,7 @@ def test_expired_session_returns_spanish_error_and_can_logout(app, client):
     with app.app_context():
         token = create_access_token(identity="1", expires_delta=timedelta(seconds=-1))
     client.set_cookie("access_token_cookie", token, path="/api/")
-    response = client.get("/api/recommendations/status")
+    response = client.get("/api/auth/me")
     assert response.status_code == 401
     assert response.get_json()["error"] == "Tu sesión expiró. Inicia sesión de nuevo"
     assert client.post("/api/auth/logout").status_code == 200
@@ -346,7 +357,7 @@ def test_expired_session_returns_spanish_error_and_can_logout(app, client):
 
 
 def test_invalid_token_returns_spanish_json(client):
-    response = client.get("/api/recommendations/status", headers={"Authorization": "Bearer invalid"})
+    response = client.get("/api/auth/me", headers={"Authorization": "Bearer invalid"})
     assert response.status_code == 401
     assert response.get_json()["error"] == "La sesión no es válida. Inicia sesión de nuevo"
 
@@ -370,9 +381,22 @@ def test_health_and_docs_stay_public(client, path):
 def test_openapi_documents_cookie_and_bearer_auth_and_logout(client):
     spec = client.get("/openapi.json").get_json()
     assert spec["paths"]["/api/auth/logout"]["post"]["security"] == []
-    assert spec["paths"]["/api/recommendations"]["get"]["security"] == [
+    assert "security" not in spec["paths"]["/api/recommendations"]["get"]
+    assert "security" not in spec["paths"]["/api/anime/top"]["get"]
+    assert spec["paths"]["/api/auth/me"]["get"]["security"] == [
         {"bearerAuth": []}, {"cookieAuth": []},
     ]
-    assert spec["paths"]["/api/recommendations/train"]["post"]["security"] == [
+    assert spec["paths"]["/api/media/{anime_id}"]["post"]["security"] == [
         {"bearerAuth": []}, {"cookieAuth": [], "csrfToken": []},
     ]
+
+
+def test_login_preserves_all_existing_catalogue_results(client, monkeypatch):
+    items = [{"mal_id": number, "title": f"Anime {number}"} for number in range(1, 13)]
+    monkeypatch.setattr(anime, "get_top_anime", lambda page, limit: ({"data": items}, None))
+    original = client.get("/api/anime/top?limit=12")
+    register(client)
+    login(client)
+    logged_in = client.get("/api/anime/top?limit=12")
+    assert original.status_code == logged_in.status_code == 200
+    assert original.get_json() == logged_in.get_json() == {"data": items}

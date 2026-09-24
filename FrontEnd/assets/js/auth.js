@@ -107,7 +107,7 @@ window.AnimeAuth = (() => {
     window.scrollTo({ top: 0 });
   }
 
-  async function request(path, { authenticated = true, ...options } = {}) {
+  async function request(path, { authenticated = true, credentials = 'include', ...options } = {}) {
     if (authenticated && !user) {
       throw Object.assign(new Error('Ingresá para continuar.'), { silent: true });
     }
@@ -129,7 +129,7 @@ window.AnimeAuth = (() => {
     }
     try {
       const response = await fetch(`${API}${path}`, {
-        ...options, headers, method, credentials: 'include', cache: 'no-store', signal: controller.signal,
+        ...options, headers, method, credentials, cache: 'no-store', signal: controller.signal,
       });
       const payload = await response.json().catch(() => ({}));
       if (version !== sessionVersion) throw Object.assign(new Error('La sesión cambió.'), { silent: true });
@@ -199,8 +199,14 @@ window.AnimeAuth = (() => {
       const result = await request(registering ? '/auth/register' : '/auth/login', {
         authenticated: false, method: 'POST', body,
       });
-      enterApplication(result.user, result.expiresAt);
-      channel?.postMessage('signed-in');
+      if (registering) {
+        showLogin('¡Tu cuenta está lista! Ingresá con tu correo y contraseña para continuar.', 'success');
+        $('#authEmail').value = result.user.email;
+        $('#authPassword').focus();
+      } else {
+        enterApplication(result.user, result.expiresAt);
+        channel?.postMessage('signed-in');
+      }
     } catch (error) {
       if (!error.silent) message(error.message);
     } finally {

@@ -120,10 +120,10 @@ def register():
     finally:
         _close_resources(cursor, connection)
 
-    return _session_response(
-        {"id": user_id, "nombre": data["nombre"], "email": data["email"]},
-        "Usuario registrado correctamente", 201,
-    )
+    return jsonify({
+        "message": "Usuario registrado correctamente. Inicia sesión para continuar",
+        "user": {"id": user_id, "nombre": data["nombre"], "email": data["email"]},
+    }), 201
 
 
 @auth_bp.post("/login")

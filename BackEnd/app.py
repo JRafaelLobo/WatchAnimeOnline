@@ -1,9 +1,9 @@
 import os
 from datetime import timedelta
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, verify_jwt_in_request
+from flask_jwt_extended import JWTManager
 
 from config.sqlserver import initialize_database
 from routes.anime import anime_bp
@@ -81,17 +81,6 @@ def create_app():
     # ========================================================
     # ROUTES
     # ========================================================
-
-    @app.before_request
-    def require_session_for_application():
-        if request.method != "OPTIONS" and request.blueprint in {"anime", "recommendations", "media"}:
-            verify_jwt_in_request()
-
-    @app.after_request
-    def prevent_private_response_caching(response):
-        if request.blueprint in {"anime", "recommendations", "media"}:
-            response.headers["Cache-Control"] = "private, no-store"
-        return response
 
     app.register_blueprint(
         auth_bp,
@@ -297,7 +286,7 @@ def _complete_openapi_spec():
         for method, operation in item.items():
             operation["tags"] = [tag]
             operation.setdefault("responses", {})["500"] = {"description": "Error interno"}
-            if path.startswith(("/api/anime/", "/api/recommendations", "/api/media/")) or path == "/api/auth/me":
+            if operation.get("security"):
                 cookie_security = {"cookieAuth": []}
                 if method in {"post", "put", "patch", "delete"}:
                     cookie_security["csrfToken"] = []
@@ -317,6 +306,16 @@ def _complete_openapi_spec():
             "503": {"description": "Base de datos no disponible"}
         })
     paths["/api/auth/register"]["post"]["responses"]["409"] = {"description": "Email ya registrado"}
+    paths["/api/auth/register"]["post"]["responses"]["201"] = {
+        "description": "Cuenta creada; requiere iniciar sesión por separado",
+        "content": {"application/json": {"schema": {
+            "type": "object", "required": ["message", "user"],
+            "properties": {
+                "message": {"type": "string"},
+                "user": {"$ref": "#/components/schemas/AuthUser"}
+            }
+        }}}
+    }
     paths["/api/auth/me"]["get"]["responses"].update({
         "200": {"description": "Usuario actual y expiración", "content": {"application/json": {"schema": {
             "allOf": [{"$ref": "#/components/schemas/AuthUser"}, {"type": "object", "properties": {
