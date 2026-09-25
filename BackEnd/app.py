@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -28,6 +29,14 @@ def create_app():
         )
 
     app.config["JWT_SECRET_KEY"] = jwt_secret
+    app.config.update(
+        JWT_TOKEN_LOCATION=["headers", "cookies"],
+        JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=8),
+        JWT_ACCESS_COOKIE_PATH="/api/",
+        JWT_COOKIE_CSRF_PROTECT=True,
+        JWT_COOKIE_SAMESITE="Lax",
+        JWT_COOKIE_SECURE=os.getenv("JWT_COOKIE_SECURE", "false").lower() in ("true", "1", "yes"),
+    )
 
     initialize_database()
 
@@ -40,10 +49,25 @@ def create_app():
     # EXTENSIONS
     # ========================================================
 
-    JWTManager(app)
+    jwt = JWTManager(app)
+
+    @jwt.unauthorized_loader
+    def missing_session(reason):
+        if "CSRF" in reason:
+            return jsonify({"error": "No se pudo verificar tu sesión. Recarga la página e intenta de nuevo"}), 401
+        return jsonify({"error": "Inicia sesión para continuar"}), 401
+
+    @jwt.expired_token_loader
+    def expired_session(_header, _payload):
+        return jsonify({"error": "Tu sesión expiró. Inicia sesión de nuevo"}), 401
+
+    @jwt.invalid_token_loader
+    def invalid_session(_reason):
+        return jsonify({"error": "La sesión no es válida. Inicia sesión de nuevo"}), 401
 
     CORS(
         app,
+        supports_credentials=True,
         resources={
             r"/api/*": {
                 "origins": [
@@ -149,11 +173,21 @@ OPENAPI_SPEC = {
 def _complete_openapi_spec():
     """Keep the hand-written contract aligned with the registered routes."""
     OPENAPI_SPEC["info"].update({
-        "version": "1.1.0",
+        "version": "1.2.0",
         "description": (
             "API REST para catálogo de anime, recomendaciones ALS, "
             "autenticación JWT y archivos MongoDB/GridFS."
         )
+    })
+    OPENAPI_SPEC["components"]["securitySchemes"].update({
+        "cookieAuth": {
+            "type": "apiKey", "in": "cookie", "name": "access_token_cookie",
+            "description": "Cookie HttpOnly de sesión, emitida al ingresar o registrarse; vence en 8 horas."
+        },
+        "csrfToken": {
+            "type": "apiKey", "in": "header", "name": "X-CSRF-TOKEN",
+            "description": "Para modificar datos con cookies, copiar el valor de la cookie csrf_access_token."
+        }
     })
     OPENAPI_SPEC["tags"] = [
         {"name": "System", "description": "Estado del servicio"},
@@ -167,16 +201,31 @@ def _complete_openapi_spec():
         "RegisterRequest": {
             "type": "object", "required": ["nombre", "email", "password"],
             "properties": {
-                "nombre": {"type": "string", "minLength": 1},
-                "email": {"type": "string", "format": "email"},
-                "password": {"type": "string", "format": "password", "minLength": 8}
+                "nombre": {"type": "string", "minLength": 1, "maxLength": 100},
+                "email": {"type": "string", "format": "email", "maxLength": 255},
+                "password": {"type": "string", "format": "password", "minLength": 8, "maxLength": 128}
             }
         },
         "LoginRequest": {
             "type": "object", "required": ["email", "password"],
             "properties": {
-                "email": {"type": "string", "format": "email"},
-                "password": {"type": "string", "format": "password"}
+                "email": {"type": "string", "format": "email", "maxLength": 255},
+                "password": {"type": "string", "format": "password", "minLength": 1, "maxLength": 1024}
+            }
+        },
+        "AuthUser": {
+            "type": "object", "required": ["id", "nombre", "email"],
+            "properties": {
+                "id": {"type": "integer"}, "nombre": {"type": "string"},
+                "email": {"type": "string", "format": "email"}
+            }
+        },
+        "SessionResponse": {
+            "type": "object", "required": ["user", "accessToken", "expiresAt"],
+            "properties": {
+                "message": {"type": "string"}, "accessToken": {"type": "string"},
+                "expiresAt": {"type": "integer", "description": "Expiración de la sesión en segundos Unix"},
+                "user": {"$ref": "#/components/schemas/AuthUser"}
             }
         },
         "ErrorResponse": {
@@ -223,15 +272,26 @@ def _complete_openapi_spec():
     })
 
     paths = OPENAPI_SPEC["paths"]
+    paths["/api/auth/logout"] = {"post": {
+        "summary": "Cerrar sesión", "security": [],
+        "description": "Borra las cookies incluso cuando la sesión ya expiró.",
+        "responses": {"200": {"description": "Sesión cerrada"}}
+    }}
     tags_by_prefix = {
         "/api/health": "System", "/api/auth/": "Auth", "/api/anime/": "Anime",
         "/api/recommendations/": "Recommendations", "/api/media/": "Media"
     }
     for path, item in paths.items():
         tag = next((value for prefix, value in tags_by_prefix.items() if path.startswith(prefix)), "System")
-        for operation in item.values():
+        for method, operation in item.items():
             operation["tags"] = [tag]
             operation.setdefault("responses", {})["500"] = {"description": "Error interno"}
+            if operation.get("security"):
+                cookie_security = {"cookieAuth": []}
+                if method in {"post", "put", "patch", "delete"}:
+                    cookie_security["csrfToken"] = []
+                operation["security"] = [{"bearerAuth": []}, cookie_security]
+                operation["responses"]["401"] = {"description": "Sesión ausente, inválida o expirada"}
 
     paths["/api/health"]["get"].update({
         "operationId": "healthCheck",
@@ -239,8 +299,32 @@ def _complete_openapi_spec():
     })
     paths["/api/auth/register"]["post"]["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/RegisterRequest"}
     paths["/api/auth/login"]["post"]["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/LoginRequest"}
-    paths["/api/auth/register"]["post"]["responses"].update({"409": {"description": "Email ya registrado"}, "500": {"description": "No se pudo registrar"}})
-    paths["/api/auth/login"]["post"]["responses"].update({"500": {"description": "Error de base de datos"}})
+    for path, status in (("/api/auth/register", "201"), ("/api/auth/login", "200")):
+        paths[path]["post"]["responses"].update({
+            status: {"description": "Sesión iniciada y cookies emitidas", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SessionResponse"}}}},
+            "400": {"description": "Datos de formulario inválidos"},
+            "503": {"description": "Base de datos no disponible"}
+        })
+    paths["/api/auth/register"]["post"]["responses"]["409"] = {"description": "Email ya registrado"}
+    paths["/api/auth/register"]["post"]["responses"]["201"] = {
+        "description": "Cuenta creada; requiere iniciar sesión por separado",
+        "content": {"application/json": {"schema": {
+            "type": "object", "required": ["message", "user"],
+            "properties": {
+                "message": {"type": "string"},
+                "user": {"$ref": "#/components/schemas/AuthUser"}
+            }
+        }}}
+    }
+    paths["/api/auth/me"]["get"]["responses"].update({
+        "200": {"description": "Usuario actual y expiración", "content": {"application/json": {"schema": {
+            "allOf": [{"$ref": "#/components/schemas/AuthUser"}, {"type": "object", "properties": {
+                "fechaCreacion": {"type": "string", "format": "date-time", "nullable": True},
+                "expiresAt": {"type": "integer"}
+            }}]
+        }}}},
+        "503": {"description": "Base de datos no disponible"}
+    })
     for path in ("/api/anime/top", "/api/anime/season/now"):
         paths[path]["get"]["parameters"] = [
             {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "default": 1}},

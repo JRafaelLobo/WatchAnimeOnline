@@ -1,26 +1,12 @@
-const API = 'http://localhost:5000/api';
+const API = AnimeAuth.API;
 let catalog = [];
 let slide = 0;
 const $ = (selector) => document.querySelector(selector);
 const animeTitle = (anime) => anime?.title || anime?.title_english || 'Anime sin título';
 const animeImage = (anime) => `${API}/media/${anime.mal_id || anime.movieId}/image`;
 
-async function request(path) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  let response;
-  try {
-    response = await fetch(`${API}${path}`, { signal: controller.signal });
-  } catch (error) {
-    if (error.name === 'AbortError') throw new Error('La API tardó demasiado en responder');
-    throw new Error('No se pudo conectar con el backend');
-  } finally {
-    clearTimeout(timeout);
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || 'La API no respondió');
-  return payload;
-}
+// The login gates this page; the shared catalogue keeps its original API flow.
+const request = (path) => AnimeAuth.request(path, { credentials: 'omit' });
 
 function toast(message) {
   const element = $('#toast');
@@ -36,6 +22,7 @@ async function checkApi() {
     $('#apiStatus').textContent = 'API online';
     $('#apiStatusDot').classList.add('online');
   } catch (error) {
+    if (error.silent) return;
     $('#apiStatus').textContent = 'API offline';
     $('#apiStatusDot').classList.add('offline');
   }
@@ -74,6 +61,7 @@ async function loadCatalog(path = '/anime/top?limit=12') {
     const payload = await request(path);
     renderCatalog(payload.data || []);
   } catch (error) {
+    if (error.silent) return;
     renderCatalog([]);
     $('#catalogStatus').textContent = error.message;
   }
@@ -86,7 +74,7 @@ async function searchAnime(query) {
     const payload = await request(`/anime/search?q=${encodeURIComponent(query)}&limit=12`);
     renderCatalog(payload.data || []);
   } catch (error) {
-    toast(error.message);
+    if (!error.silent) toast(error.message);
   }
 }
 
@@ -108,7 +96,7 @@ async function showDetail(id) {
     setHero(payload.data || payload);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (error) {
-    toast(error.message);
+    if (!error.silent) toast(error.message);
   }
 }
 
@@ -137,15 +125,59 @@ $('#recommendForm').addEventListener('click', async () => {
     const limit = Number($('#recommendLimit').value);
     const result = await request(`/recommendations?limit=${limit}`);
     const recommendations = result.recommendations || [];
-    resultList.innerHTML = recommendations.length
-      ? `<div class="recommendation-summary">${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles</div>${recommendations.map((item) => `<div class="result-item"><strong>${item.title || `Anime #${item.movieId}`}</strong><small>#${item.movieId}</small><span>★ ${item.predictedRating.toFixed(2)}</span><a class="result-link" href="#" data-anime-id="${item.movieId}">Ver</a></div>`).join('')}`
-      : `<span>${result.message || 'No hay recomendaciones para este usuario.'}</span>`;
-    resultList.querySelectorAll('[data-anime-id]').forEach((link) => link.addEventListener('click', (clickEvent) => {
-      clickEvent.preventDefault();
-      showDetail(link.dataset.animeId);
-    }));
-  } catch (error) { toast(error.message); }
+    resultList.replaceChildren();
+    if (!recommendations.length) {
+      resultList.textContent = result.message || 'No hay recomendaciones disponibles.';
+      return;
+    }
+    const summary = document.createElement('div');
+    summary.className = 'recommendation-summary';
+    summary.textContent = `${result.returnedCount} de ${result.requestedLimit} recomendaciones disponibles`;
+    const rail = document.createElement('div');
+    rail.className = 'rail';
+    rail.tabIndex = 0;
+    rail.setAttribute('role', 'region');
+    rail.setAttribute('aria-label', 'Recomendaciones de la comunidad');
+    recommendations.forEach((item) => {
+      const card = createCard({
+        ...item,
+        title: item.title || `Anime #${item.movieId}`,
+        score: item.predictedRating.toFixed(2),
+      });
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `Ver detalle de ${item.title || `Anime #${item.movieId}`}`);
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          card.click();
+        }
+      });
+      rail.appendChild(card);
+    });
+    resultList.appendChild(summary);
+    resultList.appendChild(rail);
+  } catch (error) { if (!error.silent) toast(error.message); }
 });
 
-checkApi();
-loadCatalog();
+document.addEventListener('anime:message', (event) => toast(event.detail));
+document.addEventListener('anime:logout', () => {
+  catalog = [];
+  slide = 0;
+  $('#animeRail').replaceChildren();
+  $('#heroImage').style.backgroundImage = '';
+  $('#heroTitle').textContent = 'Cargando tu próxima historia';
+  $('#heroDetail').onclick = null;
+  $('#watchButton').onclick = null;
+  $('#searchForm').reset();
+  $('#recommendationResults').textContent = 'Generá una lista basada en los gustos aprendidos.';
+  $('#toast').classList.remove('show');
+  document.querySelectorAll('[data-catalog]').forEach((button) => button.classList.toggle('active', button.dataset.catalog === 'top'));
+});
+
+AnimeAuth.start(() => {
+  $('#apiStatus').textContent = 'Conectando API...';
+  $('#apiStatusDot').classList.remove('online', 'offline');
+  checkApi();
+  loadCatalog();
+});
