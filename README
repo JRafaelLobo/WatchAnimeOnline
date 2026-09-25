@@ -1,317 +1,325 @@
-# Sistema Recomendador de Anime
+# WatchAnimeOnline
 
-## Proyecto Integrador
+Proyecto integrador para consultar y descubrir anime mediante una aplicación web y un sistema de recomendaciones construido con Apache Spark. La interfaz, presentada como **Anime Atlas**, permite crear una cuenta, explorar el catálogo y obtener recomendaciones comunitarias a partir de valoraciones históricas.
 
-Aplicación web para la visualización y recomendación personalizada de anime.
+El proyecto integra Flask, SQL Server, MongoDB/GridFS, Apache Hop y un Front End con HTML, CSS y JavaScript. Docker Compose organiza los servicios y su almacenamiento persistente.
 
-El proyecto implementa una arquitectura basada en APIs y contenedores Docker. Incluye autenticación de usuarios, consulta de información de anime, almacenamiento de contenido multimedia y un sistema recomendador basado en Apache Spark utilizando el algoritmo ALS.
+## Contenido
 
-## Descripción
+- [Funcionalidades](#funcionalidades)
+- [Arquitectura y tecnologías](#arquitectura-y-tecnologías)
+- [Inicio rápido](#inicio-rápido)
+- [Migración de datos](#migración-de-datos)
+- [Sistema de recomendaciones](#sistema-de-recomendaciones)
+- [API y autenticación](#api-y-autenticación)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Pruebas](#pruebas)
+- [Operación y solución de problemas](#operación-y-solución-de-problemas)
+- [Documentación y autores](#documentación-y-autores)
 
-El objetivo del proyecto es desarrollar un sitio web en el cual los usuarios puedan registrarse, iniciar sesión, consultar información relacionada con anime y recibir recomendaciones personalizadas.
+## Funcionalidades
 
-Tecnologías principales:
-- Frontend: interfaz web utilizada por los usuarios.
-- Flask: API REST principal del sistema.
-- Apache Spark / PySpark: procesamiento de datos y sistema recomendador.
-- ALS: algoritmo utilizado para generar recomendaciones.
-- Microsoft SQL Server: almacenamiento de información estructurada y dataset.
-- Apache Hop: proceso ETL encargado de migrar el dataset hacia SQL Server.
-- MongoDB / GridFS: almacenamiento de imágenes y documentos asociados a los anime.
-- Jikan API: fuente externa para consultar información pública relacionada con anime.
-- Docker / Docker Compose: contenerización y comunicación entre servicios.
+| Componente | Funcionalidad implementada |
+| --- | --- |
+| Acceso | Registro, inicio de sesión, recuperación de la sesión al recargar y cierre de sesión. |
+| Catálogo | Búsqueda por título, tendencias, temporada actual, géneros y consulta de detalles. |
+| Interfaz | Tarjetas, portadas, sinopsis cuando está disponible, diseño adaptable y estados de carga o error. |
+| Recomendaciones | Selección de 5, 10, 20 o 30 recomendaciones comunitarias desde la web. |
+| Multimedia | API para cargar, listar, recuperar y eliminar imágenes y PDF; almacenamiento de portadas en GridFS. |
+| Datos | Pipeline ETL para preparar usuarios, títulos y valoraciones e importarlos a SQL Server. |
+| API | Documentación Swagger/OpenAPI y consulta del estado del modelo. |
 
-## Arquitectura del Sistema
+**Alcance actual:** la aplicación permite consultar información; el botón «Ver ahora» abre la ficha del anime. No hay reproducción de episodios, captura de nuevas valoraciones ni listas personales. Las cuentas registradas se almacenan separadamente de los usuarios del dataset, por lo que iniciar sesión no personaliza las recomendaciones de la web. La gestión de archivos se realiza mediante la API; no tiene una pantalla propia en el Front End.
 
-                         USUARIO
-                            |
-                            v
-                    +---------------+
-                    |   FrontEnd    |
-                    |    :3000      |
-                    +-------+-------+
-                            |
-                         REST API
-                            |
-                            v
-                    +---------------+
-                    |   Flask API   |
-                    |    :5000      |
-                    +---+-------+---+
-                        |       |
-              +---------+       +---------+
-              |                           |
-              v                           v
-       +--------------+            +--------------+
-       | SQL Server   |            |   MongoDB    |
-       |    :1433     |            |    :27017    |
-       +------+-------+            |    GridFS    |
-              ^                    +--------------+
-              |
-          Apache Hop
-              ^
-              |
-          Dataset
+## Arquitectura y tecnologías
 
-Flask API también se comunica con Jikan API para obtener información complementaria de anime y con PySpark/ALS para generar recomendaciones.
-
-## Estructura del Proyecto
-
-Tarea8/
-|-- docker-compose.yml
-|-- .env
-|-- .gitignore
-|-- README.txt
-|-- ApacheHop/
-|   |-- Dockerfile
-|   |-- data/
-|   |-- pipelines/
-|   `-- workflows/
-|-- BackEnd/
-|   |-- Dockerfile
-|   |-- requirements.txt
-|   |-- app.py
-|   |-- config/
-|   |-- routes/
-|   `-- services/
-|-- BaseDeDatos/
-|   |-- 01-database.sql
-|   `-- 02-users.sql
-`-- FrontEnd/
-    |-- Dockerfile
-    |-- package.json
-    |-- src/
-    `-- public/
-
-## Backend
-
-El Backend está desarrollado con Flask y funciona como punto central de comunicación. Se divide en config, routes y services.
-
-Endpoints principales:
-
-Sistema:
-GET /api/health
-
-Autenticación:
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/me
-
-Anime:
-GET /api/anime/search?q=naruto
-GET /api/anime/<id>
-GET /api/anime/top
-GET /api/anime/genres
-GET /api/anime/season/now
-
-Recomendador:
-GET  /api/recommendations/status
-POST /api/recommendations/train
-GET  /api/recommendations/me
-GET  /api/recommendations/<user_id>
-
-Multimedia:
-POST   /api/media/<anime_id>
-GET    /api/media/<anime_id>
-GET    /api/media/file/<file_id>
-DELETE /api/media/file/<file_id>
-
-## Autenticación
-
-Al abrir el frontend en `http://localhost:3000` se muestra la pantalla de
-ingreso. Es obligatorio iniciar sesión para acceder desde la web al catálogo,
-las búsquedas y las recomendaciones; no existe acceso como invitado.
-
-Para crear una cuenta se solicitan nombre (hasta 100 caracteres), correo
-(hasta 255 caracteres), contraseña (de 8 a 128 caracteres) y confirmación.
-El backend guarda el usuario en `AnimeDB.dbo.auth_users`, con contraseña
-hasheada y fecha de creación. Un correo ya registrado no puede duplicarse.
-Después del registro se vuelve al formulario de ingreso, con el correo ya
-completado. Crear una cuenta no inicia sesión: es necesario ingresar la contraseña
-y pulsar «Ingresar».
-
-La sesión se conserva al recargar mediante una cookie HttpOnly y vence a las
-8 horas. Las peticiones protegidas con cookies incluyen protección CSRF. El botón
-«Cerrar sesión» elimina las cookies y vuelve a la pantalla de ingreso.
-El login actúa como paso previo en la interfaz; los endpoints del catálogo,
-las recomendaciones generales y las imágenes conservan su comportamiento original.
-Las recomendaciones siguen siendo generales para todos: las cuentas
-de acceso no se vinculan con los usuarios del dataset ni modifican el modelo ALS.
-
-Después de actualizar el código, reconstruir los dos servicios web:
-
-```sh
-docker compose up -d --build backend frontend
+```mermaid
+flowchart LR
+    CSV[Archivos CSV] --> Hop[Apache Hop]
+    Hop --> SQL[(SQL Server · AnimeDB)]
+    Usuario[Usuario] --> Web[Front End · Nginx :3000]
+    Web --> API[Flask API :5000]
+    API <--> SQL
+    API <--> Mongo[(MongoDB / GridFS)]
+    API --> Jikan[Jikan API]
+    SQL --> ALS[PySpark / ALS]
+    ALS --> API
 ```
 
-El esquema existente ya incluye `auth_users`; no hace falta modificar las
-tablas del ETL. Los datos de los usuarios persisten en el volumen de SQL Server.
+PySpark se ejecuta dentro del contenedor del Back End. Los servicios de Compose comparten la red `anime_network`; Apache Hop se habilita por separado mediante el perfil `etl`.
 
-Los clientes de la API también pueden seguir usando el token JWT devuelto en
-`accessToken`. Las peticiones protegidas deben enviar:
+| Tecnología | Responsabilidad |
+| --- | --- |
+| HTML, CSS y JavaScript nativo | Interfaz y solicitudes a la API mediante `fetch`, sin framework de Front End. |
+| Nginx | Publicación de los archivos estáticos de la web. |
+| Python 3.12 / Flask | API REST organizada en configuración, rutas y servicios. |
+| SQL Server 2022 | Catálogo importado, usuarios históricos, valoraciones y cuentas de acceso. |
+| MongoDB 8 / GridFS | Archivos multimedia y portadas. |
+| Apache Hop 2.16 | Extracción, transformación y carga del dataset. |
+| PySpark 4 / ALS | Filtrado colaborativo y persistencia del modelo de recomendaciones. |
+| Jikan | Información de anime, consultada desde el Back End. |
+| Docker / Docker Compose | Construcción, inicio y comunicación de los servicios. |
 
-Authorization: Bearer TOKEN
+Las dependencias de Python están en [BackEnd/requirement.txt](BackEnd/requirement.txt). El Front End no requiere `npm install` ni compilación.
 
-Endpoints de sesión: `POST /api/auth/register`, `POST /api/auth/login`,
-`GET /api/auth/me` y `POST /api/auth/logout`.
+## Inicio rápido
 
-## Microsoft SQL Server
+### 1. Preparar el entorno
 
-SQL Server funciona como base de datos relacional principal. La base utilizada por el proyecto es AnimeDB y almacena la información importada por Apache Hop en `Usuarios`, `Animes` y `Reviews`.
+Se necesita Docker con Docker Compose, acceso a Internet para construir las imágenes y consultar Jikan, y los puertos `3000`, `5000`, `1433` y `27017` disponibles. Los ejemplos de terminal utilizan Bash, disponible en Linux y WSL.
 
-Las valoraciones importadas se almacenan en `Reviews` con las columnas:
-- `user_id`
-- `anime_id`
-- `my_score`
+Ejecuta los comandos desde la carpeta que contiene [docker-compose.yml](docker-compose.yml):
 
-La tabla `ratings` se conserva por compatibilidad con el diseño inicial, pero
-no es la fuente usada por el backend actual porque queda vacía en el pipeline
-de Apache Hop.
+```bash
+cd WatchAnimeOnline
+```
 
-Al ejecutar Docker Compose, el servicio `database-init` ejecuta
-`BaseDeDatos/01-tables.sql` después de que SQL Server esté saludable.
-El script es idempotente: crea `ratings`, `Usuarios`, `Animes`, `Reviews`
-y `auth_users` solamente si no existen. Si encuentra la tabla de
-autenticación antigua `Usuarios`, la conserva como `Usuarios_legacy` antes
-de crear la estructura usada por Apache Hop.
+Si ya estás dentro de esa carpeta, omite el comando anterior. Crea `.env` a partir del ejemplo únicamente si todavía no existe:
 
-`Usuarios`, `Animes` y `Reviews` son tablas del proceso ETL. Las credenciales
-de la API se almacenan separadamente en `auth_users`, para no interferir con
-los inserts de Apache Hop.
+```bash
+if [ ! -f .env ]; then
+    cp .env.example .env
+fi
+```
 
-## Apache Hop
+Edita `.env` y sustituye las credenciales de ejemplo por valores propios. El archivo está excluido de Git.
 
-Apache Hop se utiliza para ejecutar el proceso ETL requerido en el proyecto. El dataset debe migrarse hacia Microsoft SQL Server mediante los pipelines correspondientes.
+| Variable de `.env` | Uso |
+| --- | --- |
+| `MSSQL_SA_PASSWORD` | Contraseña de SQL Server, utilizada también por la API y el ETL. |
+| `MONGO_USER` | Usuario de MongoDB. |
+| `MONGO_PASSWORD` | Contraseña de MongoDB. |
+| `JWT_SECRET` | Clave utilizada para firmar los tokens de sesión. |
 
-Flujo:
-Dataset -> Apache Hop -> SQL Server -> PySpark ALS -> API -> Frontend
+### 2. Construir e iniciar
 
-Los recursos se organizan en:
-ApacheHop/data/
-ApacheHop/pipelines/
-ApacheHop/workflows/
+```bash
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps --all
+```
 
-## Sistema Recomendador
+Compose inicia SQL Server y MongoDB, espera sus comprobaciones de disponibilidad y ejecuta `database-init` para crear `AnimeDB` y aplicar [01-tables.sql](BaseDeDatos/01-tables.sql). Después inicia el Back End y el Front End.
 
-El sistema recomendador utiliza Apache Spark, PySpark y ALS (Alternating Least Squares).
+Es normal que `database-init` termine con estado **Exited (0)**: su trabajo finaliza al preparar el esquema. Este paso crea las tablas, pero **no importa el dataset ni entrena el modelo**.
 
-PySpark obtiene las valoraciones de `Reviews` en SQL Server. El backend las
-proyecta a `userId`, `movieId` y `rating` para que ALS utilice las interacciones
-entre usuarios y anime.
+### 3. Abrir la aplicación
 
-Flujo:
-SQL Server.Reviews -> PySpark -> ALS -> modelo -> recomendaciones -> Flask API -> Frontend
+| Recurso | Dirección |
+| --- | --- |
+| Aplicación web | [http://localhost:3000](http://localhost:3000) |
+| Documentación Swagger | [http://localhost:5000/docs](http://localhost:5000/docs) |
+| Especificación OpenAPI | [http://localhost:5000/openapi.json](http://localhost:5000/openapi.json) |
+| Disponibilidad de la API | [http://localhost:5000/api/health](http://localhost:5000/api/health) |
 
-## API Externa de Anime
+Registra una cuenta y luego inicia sesión. El registro solicita nombre, correo, contraseña de 8 a 128 caracteres y confirmación; crear la cuenta no inicia sesión automáticamente.
 
-El Backend dispone de una integración con Jikan para obtener información complementaria sobre anime, como títulos, sinopsis, géneros, episodios, puntuaciones y otros metadatos.
+El catálogo puede consultar Jikan antes de importar los CSV. Las recomendaciones y el respaldo local del catálogo requieren completar la [migración de datos](#migración-de-datos).
 
-El Frontend no consulta directamente la API externa. La comunicación se centraliza mediante Flask:
-Frontend -> Flask API -> Jikan API
+## Migración de datos
 
-La API externa complementa el proyecto y no sustituye la migración del dataset realizada mediante Apache Hop.
+El archivo [ApacheHop/pipelines/etl.hpl](ApacheHop/pipelines/etl.hpl) contiene el proceso ETL. **Los CSV y los metadatos de la conexión `Anime_Conn` no están incluidos en el repositorio.** Deben prepararse antes de ejecutar el pipeline.
 
-## MongoDB y GridFS
+### Entradas y transformaciones
 
-MongoDB se utiliza para almacenar contenido multimedia asociado a anime, particularmente imágenes y archivos PDF. GridFS permite almacenar y recuperar los archivos desde el Backend.
+| Archivo esperado | Contenido |
+| --- | --- |
+| `anime_cleaned.csv` | Títulos, identificadores, popularidad y metadatos del catálogo. |
+| `animelists_cleaned.csv` | Valoraciones y estado de seguimiento de cada anime por usuario. |
+| `users_cleaned.csv` | Nombres de usuario, identificadores y estadísticas. |
 
-Flujo:
-Frontend -> Flask API -> MongoDB / GridFS
+Los CSV deben respetar las columnas y tipos definidos en los pasos de entrada del pipeline. El flujo ordena los títulos por popularidad, selecciona hasta 1.000 registros, conserva las interacciones que coinciden con ese catálogo, filtra puntuaciones positivas y estados de seguimiento, relaciona `username` con `user_id` y elimina columnas que no utiliza la carga.
 
-## Docker
+### Ejecutar desde Apache Hop GUI
 
-Los componentes principales se ejecutan utilizando contenedores Docker.
+1. Inicia los servicios con Compose para disponer de `AnimeDB` y sus tablas.
+2. Crea o selecciona un proyecto de Hop cuya carpeta de inicio sea `WatchAnimeOnline/ApacheHop`. El pipeline busca los CSV en `${PROJECT_HOME}/Datos/`; crea esa carpeta y coloca allí los tres archivos.
+3. Configura una conexión relacional llamada **`Anime_Conn`** para Microsoft SQL Server. Desde Hop ejecutado en el equipo anfitrión, utiliza `localhost`, puerto `1433`, base `AnimeDB`, usuario `sa` y la contraseña configurada en `.env`. Comprueba la conexión y la disponibilidad del controlador JDBC de SQL Server en Hop.
+4. Abre `pipelines/etl.hpl`, crea o selecciona una configuración de ejecución local y ejecuta el pipeline. Revisa el resultado de los pasos y los errores de entrada o escritura.
+5. Comprueba la carga en SQL Server y solicita el entrenamiento del recomendador.
 
-Servicios:
-- sqlserver
-- mongodb
-- database-init
-- backend
-- frontend
-- apache-hop
+**La carga reemplaza los datos anteriores:** los pasos de salida tienen activado `truncate` para `Usuarios`, `Animes` y `Reviews`, con lotes de 1.000 filas. `auth_users` no participa en el ETL.
 
-Los servicios se comunican mediante la red anime_network.
+Para revisar las cantidades, ejecuta en `AnimeDB`:
 
-Puertos:
-- Frontend: 3000
-- Backend: 5000
-- SQL Server: 1433
-- MongoDB: 27017
+```sql
+SELECT 'Usuarios' AS tabla, COUNT_BIG(*) AS filas FROM dbo.Usuarios
+UNION ALL
+SELECT 'Animes', COUNT_BIG(*) FROM dbo.Animes
+UNION ALL
+SELECT 'Reviews', COUNT_BIG(*) FROM dbo.Reviews;
+```
 
-## Variables de Entorno
+### Estado de la ejecución en Docker
 
-El proyecto utiliza un archivo .env en la raíz.
+El servicio `apache-hop` está definido bajo el perfil `etl`, pero la configuración incluida todavía requiere completar el proyecto, los metadatos de conexión y la selección del pipeline que se ejecutará. Además, Compose monta `ApacheHop/data` en `/project/data`, mientras el pipeline lee `${PROJECT_HOME}/Datos/`: estas rutas deben unificarse antes de ejecutarlo en el contenedor. Desde ese contenedor, el servidor de la conexión SQL es `sqlserver`, no `localhost`.
 
-Ejemplo:
-MSSQL_SA_PASSWORD=CAMBIAR_PASSWORD_SQL
-MONGO_USER=animeadmin
-MONGO_PASSWORD=CAMBIAR_PASSWORD_MONGO
-JWT_SECRET=CAMBIAR_CLAVE_JWT
+Activar el perfil `etl` por sí solo no completa esta preparación ni garantiza que se ejecute `etl.hpl`.
 
-No deben publicarse credenciales reales en repositorios.
+### Esquema de almacenamiento
 
-## Ejecución
+| Tabla o almacén | Uso |
+| --- | --- |
+| `AnimeDB.dbo.Usuarios` | Usuarios del dataset y su puntuación media. |
+| `AnimeDB.dbo.Animes` | Catálogo importado. |
+| `AnimeDB.dbo.Reviews` | Valoraciones: `user_id`, `anime_id` y `my_score`. |
+| `AnimeDB.dbo.auth_users` | Cuentas de la aplicación, correo único y contraseña almacenada mediante hash. |
+| MongoDB `anime_media` / GridFS | Metadatos y contenido de los archivos. |
 
-Validar Docker Compose:
-docker compose config
+El script SQL crea las tablas que faltan. Si encuentra una antigua tabla `Usuarios` sin la columna `username`, intenta conservarla como `Usuarios_legacy` antes de crear la estructura del ETL. Las cuentas de acceso y los usuarios históricos son conjuntos independientes.
 
-Construir imágenes:
-docker compose build
+## Sistema de recomendaciones
 
-Levantar servicios:
-docker compose up -d
+El servicio obtiene las valoraciones de SQL Server, descarta identificadores nulos y puntuaciones nulas o no positivas, convierte los campos a `userId`, `movieId` y `rating`, y entrena un modelo **ALS** (*Alternating Least Squares*). Conserva el modelo en el volumen `anime_als_model_data` para recuperarlo tras reiniciar el contenedor.
 
-El servicio `database-init` termina con estado `Exited (0)` después de aplicar
-el esquema; esto es esperado. Backend y frontend esperan a que finalice
-correctamente.
+- **Recomendaciones comunitarias:** agregan las predicciones de los usuarios del modelo; son las que muestra la web.
+- **Recomendaciones por usuario:** utilizan un identificador del dataset y excluyen los títulos ya valorados por ese usuario.
+- **Primera solicitud:** intenta recuperar el modelo guardado y, si no puede, entrenarlo. Puede tardar más que las siguientes consultas.
 
-Consultar estado:
-docker compose ps
+En una base creada con el esquema actual, la fuente es `Reviews`. Por compatibilidad, el código da prioridad a una tabla `ratings` si ya existe, incluso si está vacía. El script SQL actual no crea esa tabla; revisa esta condición al reutilizar una base antigua.
 
-Consultar logs:
-docker compose logs -f
+Después de cargar o actualizar el dataset:
 
-Backend:
-docker compose logs -f backend
+```bash
+curl -X POST http://localhost:5000/api/recommendations/train
+curl http://localhost:5000/api/recommendations/status
+curl 'http://localhost:5000/api/recommendations?limit=10'
+```
 
-Ejecutar Apache Hop con el perfil ETL:
-docker compose --profile etl run --rm apache-hop
+Comprueba que la respuesta del entrenamiento indique `success: true`. Si no hay valoraciones, puede responder HTTP 200 con `success: false`; las consultas de recomendaciones sin modelo disponible devuelven HTTP 503. El estado informa sobre el modelo cargado en memoria y no lo carga ni entrena por sí mismo.
 
-Detener proyecto:
+Los valores `MAX_RATINGS=1000000`, `SPARK_DRIVER_MEMORY=2g` y `ALS_MODEL_PATH=/app/model/als_model` se definen en la sección `backend.environment` de Compose. Para modificarlos, edita esa sección o utiliza una configuración adicional de Compose; agregarlos solamente a `.env` no reemplaza los valores actuales.
+
+`GET /api/recommendations/me` utiliza el identificador de la cuenta autenticada. Actualmente no existe una relación explícita entre ese identificador y los usuarios históricos, por lo que esa ruta no garantiza recomendaciones personales correctas para una cuenta nueva. El proyecto tampoco incluye métricas de evaluación de precisión del modelo.
+
+## API y autenticación
+
+La referencia interactiva completa está en [Swagger](http://localhost:5000/docs). Las rutas siguientes usan como base `http://localhost:5000`.
+
+| Método | Ruta | Acceso | Función |
+| --- | --- | --- | --- |
+| `GET` | `/api/health` | Público | Comprueba que la API responde; también existe `/health`. |
+| `GET` | `/docs`, `/openapi.json` | Público | Documentación y contrato OpenAPI. |
+| `POST` | `/api/auth/register` | Público | Crea una cuenta con `nombre`, `email` y `password`. |
+| `POST` | `/api/auth/login` | Público | Inicia sesión con `email` y `password`. |
+| `POST` | `/api/auth/logout` | Público | Elimina las cookies de sesión del cliente. |
+| `GET` | `/api/auth/me` | JWT | Consulta el perfil autenticado. |
+| `GET` | `/api/anime/search?q=naruto` | Público | Busca títulos; requiere `q`. |
+| `GET` | `/api/anime/top` | Público | Consulta títulos destacados. |
+| `GET` | `/api/anime/season/now` | Público | Consulta la temporada actual. |
+| `GET` | `/api/anime/genres` | Público | Lista géneros. |
+| `GET` | `/api/anime/{anime_id}` | Público | Consulta el detalle de un anime. |
+| `GET` | `/api/recommendations` | Público | Genera recomendaciones comunitarias. |
+| `GET` | `/api/recommendations/status` | Público | Consulta el estado del modelo en memoria. |
+| `POST` | `/api/recommendations/train` | Público | Entrena y guarda el modelo. |
+| `GET` | `/api/recommendations/{user_id}` | Público | Recomienda para un usuario del dataset. |
+| `GET` | `/api/recommendations/me` | JWT | Solicita recomendaciones con el ID de la cuenta. |
+| `GET` | `/api/media/{anime_id}/image` | Público | Recupera una portada y la almacena en caché. |
+| `GET` | `/api/media/{anime_id}` | Público | Lista los archivos asociados a un anime. |
+| `POST` | `/api/media/{anime_id}` | JWT | Carga un archivo mediante el campo multipart `file`. |
+| `GET` | `/api/media/file/{file_id}` | Público | Recupera un archivo. |
+| `DELETE` | `/api/media/file/{file_id}` | JWT | Elimina un archivo. |
+
+La búsqueda, el listado de destacados y la temporada aceptan `page` y `limit` —hasta 25 resultados por petición—. Las rutas de recomendaciones aceptan `limit` entre 1 y 50, con valor predeterminado de 10.
+
+El login emite un JWT de ocho horas y lo entrega en una cookie HttpOnly y en el campo `accessToken`. El navegador conserva la sesión y envía `X-CSRF-TOKEN` en las operaciones protegidas que modifican datos. Los clientes que utilicen el token directamente pueden enviar:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+El cierre de sesión elimina las cookies; no revoca un token Bearer que otro cliente ya conserve. La web exige iniciar sesión antes de mostrar el catálogo, pero las rutas marcadas como públicas siguen siendo accesibles directamente.
+
+La carga de archivos admite los tipos MIME de JPG, PNG, WEBP y PDF. Flask limita el tamaño total de la solicitud a 10 MiB. Actualmente no hay roles administrativos: el entrenamiento es público y la eliminación de archivos exige sesión, pero no comprueba su propiedad. La configuración está orientada a ejecución local.
+
+## Estructura del proyecto
+
+```text
+WatchAnimeOnline/
+├── .env.example                 # Plantilla de variables de entorno
+├── docker-compose.yml          # Servicios, red y volúmenes
+├── README.md
+├── ApacheHop/
+│   ├── Dockerfile
+│   └── pipelines/etl.hpl        # Proceso de migración
+├── BackEnd/
+│   ├── Dockerfile
+│   ├── requirement.txt         # Dependencias; nombre singular en el repositorio
+│   ├── app.py                  # Entrada de la API y documentación OpenAPI
+│   ├── config/                 # Conexiones a SQL Server y MongoDB
+│   ├── routes/                 # Autenticación, catálogo, recomendaciones y medios
+│   ├── services/               # Jikan, catálogo local y recomendador
+│   ├── tests/test_auth.py      # Pruebas de autenticación y contratos de acceso
+│   └── Spark_Endpoints.py      # Prototipo independiente con MySQL y CSV
+├── BaseDeDatos/
+│   └── 01-tables.sql           # Tablas del ETL y de autenticación
+├── FrontEnd/
+│   ├── Dockerfile
+│   ├── index.html
+│   └── assets/
+│       ├── css/                # Estilos del catálogo y de autenticación
+│       └── js/                 # Interfaz, sesión y llamadas a la API
+└── Documentacion/
+    ├── Informe_WatchAnimeOnline.pdf
+    └── Informe_WatchAnimeOnline.docx
+```
+
+`Spark_Endpoints.py` no se ejecuta desde Compose ni forma parte de la API principal: el contenedor inicia `app.py`. SQL Server es la base relacional utilizada por la aplicación actual.
+
+## Pruebas
+
+[BackEnd/tests/test_auth.py](BackEnd/tests/test_auth.py) utiliza `pytest` y sustituye la conexión SQL por una implementación de prueba. Cubre registro, validaciones, duplicados, errores de base de datos, cookies, JWT, CSRF, cierre de sesión y contratos de acceso público. No necesita instancias activas de SQL Server, MongoDB, Spark o Jikan.
+
+Con la imagen del Back End construida, ejecuta las pruebas en un contenedor temporal:
+
+```bash
+docker compose run --rm --no-deps backend sh -c \
+  'python -m pip install --no-cache-dir pytest && python -m pytest -q tests/test_auth.py'
+```
+
+`pytest` no está incluido en las dependencias de ejecución; este comando lo instala únicamente en el contenedor temporal y requiere acceso a Internet. En un entorno local que ya tenga las dependencias del Back End, `pytest` y la biblioteca del sistema ODBC, también puedes ejecutar desde `BackEnd`:
+
+```bash
+python -m pytest -q tests/test_auth.py
+```
+
+Estas pruebas no validan una ejecución integral del ETL ni la calidad predictiva del recomendador.
+
+## Operación y solución de problemas
+
+Comandos desde la raíz del proyecto:
+
+```bash
+# Consultar servicios y últimos registros
+docker compose ps --all
+docker compose logs --tail=100 backend database-init
+
+# Reconstruir los servicios web después de cambios de código
+docker compose up -d --build backend frontend
+
+# Detener y retirar contenedores, conservando los volúmenes
 docker compose down
+```
 
-Para eliminar también los volúmenes:
-docker compose down -v
+Los datos persisten en `anime_sqlserver_data`, `anime_mongodb_data` y `anime_als_model_data`. **`docker compose down -v` elimina esos volúmenes**, incluidas cuentas, dataset, archivos y modelo.
 
-ADVERTENCIA: docker compose down -v elimina los volúmenes y puede borrar los datos almacenados localmente.
+| Situación | Qué revisar |
+| --- | --- |
+| `database-init` aparece como `Exited (0)` | Es el resultado esperado de la creación del esquema. |
+| La API no inicia | Verifica `.env`, el estado de SQL Server y MongoDB, y los registros de `database-init` y `backend`. |
+| El catálogo falla o devuelve menos información | Comprueba acceso a Jikan. La API usa caché de cinco minutos y respaldo parcial en `Animes`; el respaldo local no incluye sinopsis ni garantiza la temporada actual. |
+| Recomendaciones devuelven HTTP 503 | Comprueba que el ETL cargó valoraciones válidas, la prioridad de una posible tabla antigua `ratings` y los registros del entrenamiento. |
+| La primera recomendación tarda más | Puede estar iniciando Spark y entrenando el modelo. Después de modificar el dataset, vuelve a solicitar `/api/recommendations/train`. |
+| Hop no encuentra los CSV o `Anime_Conn` | Revisa `${PROJECT_HOME}/Datos/`, los archivos de entrada y los metadatos de conexión del proyecto. |
+| La web no conecta al abrirla desde otro equipo | `FrontEnd/assets/js/auth.js` apunta a `http://localhost:5000/api`. Ajusta esa URL y los orígenes CORS de `BackEnd/app.py` para el entorno, y reconstruye los servicios. |
 
-## Flujo General
+`/api/health` verifica que Flask responde; no comprueba la disponibilidad del dataset ni que el modelo esté entrenado.
 
-1. Apache Hop migra el dataset hacia SQL Server.
-2. SQL Server almacena los datos estructurados.
-3. El usuario accede al Frontend.
-4. El usuario se registra o inicia sesión.
-5. Flask administra autenticación y JWT.
-6. El usuario consulta información de anime mediante las APIs.
-7. Flask consulta información externa cuando corresponde.
-8. Imágenes y PDF pueden almacenarse en MongoDB/GridFS.
-9. PySpark obtiene valoraciones desde `Reviews` en SQL Server.
-10. ALS entrena el modelo recomendador.
-11. El usuario solicita recomendaciones.
-12. Flask devuelve los resultados al Frontend.
+## Documentación y autores
 
-## Seguridad
+El informe resume introducción, objetivos, Back End, migración y Front End en una página, con las conclusiones en una página aparte:
 
-El proyecto contempla:
-- Contraseñas mediante hash.
-- Autenticación JWT.
-- Variables de entorno para credenciales.
-- Consultas SQL parametrizadas.
-- Restricción de tipos y tamaño de archivos.
-- Red interna de Docker para comunicación entre servicios.
+- [Informe en PDF](Documentacion/Informe_WatchAnimeOnline.pdf)
+- [Versión editable en Word](Documentacion/Informe_WatchAnimeOnline.docx)
 
-## Autores
-
-- José Lobo
-- Luis Carlo
-- Felix Dominguez
+Autores: **José Lobo, Luis Carlo y Felix Dominguez**.

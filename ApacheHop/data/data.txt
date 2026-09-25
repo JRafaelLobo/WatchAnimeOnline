@@ -1,0 +1,1 @@
+https://www.kaggle.com/datasets/azathoth42/myanimelist?select=anime_cleaned.csv
